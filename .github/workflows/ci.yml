@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node-web:
+    name: Node / Web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.3
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Type-check web
+        run: pnpm --dir apps/web run type-check
+
+      - name: Build web
+        run: pnpm --dir apps/web run build
+
+  python-api:
+    name: Python / API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync API dependencies
+        working-directory: apps/api
+        run: uv sync --frozen
+
+      - name: Validate API import
+        working-directory: apps/api
+        run: uv run python -c "from src.main import read_root; assert read_root()['service'] == 'supportops api'"
+
+  python-workers:
+    name: Python / Workers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync worker dependencies
+        working-directory: apps/workers
+        run: uv sync --frozen
+
+      - name: Validate worker import
+        working-directory: apps/workers
+        run: uv run python -c "from src.celery_app import celery_app; assert celery_app.main == 'supportops_workers'"
+
+  docker-compose:
+    name: Docker Compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate compose config
+        run: docker compose config --quiet
