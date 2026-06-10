@@ -1,0 +1,61 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+__pycache__/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Next.js
+.next/
+out/
+*.tsbuildinfo
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# FastAPI
+__pycache__/
+instance/
+
+# Redis
+dump.rdb
+
+# MinIO
+.minio.sys
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Turbo
+.turbo/
+dist/

@@ -1,0 +1,8 @@
+{
+  "name": "workers",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "uv run celery -A src.celery_app worker --loglevel=info"
+  }
+}
