@@ -1,6 +1,6 @@
 # Makefile for common development tasks
 
-.PHONY: help setup dev stop logs lint format test clean docker-up docker-down
+.PHONY: help setup dev stop logs lint format test clean docker-up docker-down db-migrate db-rollback db-current
 
 help:
 	@echo "SupportOps - Development Commands"
@@ -25,7 +25,7 @@ help:
 	@echo "Utilities:"
 	@echo "  make logs           - View Docker logs"
 	@echo "  make clean          - Clean artifacts"
-	@echo "  make db-migrate     - Placeholder for future database migrations"
+	@echo "  make db-migrate     - Apply database migrations"
 
 setup:
 	@chmod +x scripts/setup.sh
@@ -67,10 +67,13 @@ test-watch:
 	npm run test:watch
 
 db-migrate:
-	@echo "Database migrations are not configured yet for the scaffold."
+	npm run db:migrate
 
-db-migrate-create:
-	@echo "Alembic will be added when database models are implemented."
+db-rollback:
+	npm run db:rollback
+
+db-current:
+	npm run db:current
 
 clean:
 	npm run clean

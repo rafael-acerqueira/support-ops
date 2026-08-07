@@ -18,7 +18,10 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f"
+    "docker:logs": "docker compose logs -f",
+    "db:migrate": "cd apps/api && uv run alembic -c alembic.ini upgrade head",
+    "db:rollback": "cd apps/api && uv run alembic -c alembic.ini downgrade -1",
+    "db:current": "cd apps/api && uv run alembic -c alembic.ini current"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
