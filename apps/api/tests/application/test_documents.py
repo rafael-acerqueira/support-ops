@@ -37,7 +37,7 @@ class InMemoryDocumentRepository:
     async def get(self, document_id: UUID) -> Document | None:
         return self.documents.get(document_id)
 
-    async def list(self) -> list[Document]:
+    async def list_all(self) -> list[Document]:
         return list(self.documents.values())
 
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:

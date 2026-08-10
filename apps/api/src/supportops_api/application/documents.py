@@ -28,7 +28,7 @@ class DocumentRepository(Protocol):
     async def get(self, document_id: UUID) -> Document | None:
         pass
 
-    async def list(self) -> list[Document]:
+    async def list_all(self) -> list[Document]:
         pass
 
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
@@ -75,7 +75,7 @@ class ListDocuments:
         self._repository = repository
 
     async def execute(self) -> list[Document]:
-        return await self._repository.list()
+        return await self._repository.list_all()
 
 
 class GetDocument:
