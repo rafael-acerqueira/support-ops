@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from supportops_api.api.dependencies import get_document_repository
+from supportops_api.api.dependencies import get_document_repository, get_document_storage
 from supportops_api.api.schemas import CreateDocumentRequest, DocumentResponse
 from supportops_api.application.documents import (
     ActivateDocument,
@@ -14,9 +14,11 @@ from supportops_api.application.documents import (
     DeactivateDocument,
     DocumentNotFoundError,
     DocumentRepository,
+    DocumentStorage,
     GetDocument,
     ListDocuments,
 )
+from supportops_api.domain.documents import DocumentType, ProductArea
 from supportops_api.infrastructure.database import get_session
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -45,6 +47,46 @@ async def create_document(
             content_type=payload.content_type,
             size_bytes=payload.size_bytes,
             tags=tuple(payload.tags),
+        )
+    )
+
+    await session.commit()
+    return DocumentResponse.from_domain(document)
+
+
+@router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+async def upload_document(
+    document_type: DocumentType = Form(...),
+    product_area: ProductArea = Form(...),
+    tags: list[str] = Form(default_factory=list),
+    file: UploadFile = File(...),
+    repository: DocumentRepository = Depends(get_document_repository),
+    storage: DocumentStorage = Depends(get_document_storage),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentResponse:
+    content_type = file.content_type or "application/octet-stream"
+
+    try:
+        stored_file = await storage.save(
+            file_name=file.filename or "document",
+            content_type=content_type,
+            content=file.file,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": str(error)},
+        ) from error
+
+    document = await CreateDocument(repository).execute(
+        CreateDocumentInput(
+            name=stored_file.file_name,
+            document_type=document_type,
+            product_area=product_area,
+            source_file_name=stored_file.file_name,
+            content_type=stored_file.content_type,
+            size_bytes=stored_file.size_bytes,
+            tags=tuple(tags),
         )
     )
 

@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from io import BytesIO
 from uuid import UUID, uuid4
 
 import httpx
@@ -6,8 +7,8 @@ import pytest
 import pytest_asyncio
 
 from src.main import app
-from supportops_api.api.dependencies import get_document_repository
-from supportops_api.application.documents import DocumentRepository
+from supportops_api.api.dependencies import get_document_repository, get_document_storage
+from supportops_api.application.documents import DocumentRepository, StoredDocumentFile
 from supportops_api.domain.documents import Document, DocumentChunk, DocumentType, ProductArea
 from supportops_api.infrastructure.database import get_session
 
@@ -18,6 +19,37 @@ class FakeSession:
 
     async def commit(self) -> None:
         self.commit_count += 1
+
+
+class InMemoryDocumentStorage:
+    def __init__(self) -> None:
+        self.saved_files: list[tuple[str, str, bytes]] = []
+
+    async def save(
+        self,
+        *,
+        file_name: str,
+        content_type: str,
+        content,
+    ) -> StoredDocumentFile:
+        data = content.read()
+        if not data:
+            raise ValueError("Document file cannot be empty")
+
+        self.saved_files.append((file_name, content_type, data))
+        return StoredDocumentFile(
+            storage_key=f"fake/{file_name}",
+            file_name=file_name,
+            content_type=content_type,
+            size_bytes=len(data),
+        )
+
+    async def open(self, storage_key: str):
+        for file_name, _content_type, data in self.saved_files:
+            if storage_key == f"fake/{file_name}":
+                return BytesIO(data)
+
+        raise FileNotFoundError(storage_key)
 
 
 class InMemoryDocumentRepository(DocumentRepository):
@@ -42,18 +74,25 @@ class InMemoryDocumentRepository(DocumentRepository):
 
 
 @pytest_asyncio.fixture
-async def api_client() -> (
-    AsyncIterator[tuple[httpx.AsyncClient, InMemoryDocumentRepository, FakeSession]]
-):
+async def api_client() -> AsyncIterator[
+    tuple[
+        httpx.AsyncClient,
+        InMemoryDocumentRepository,
+        InMemoryDocumentStorage,
+        FakeSession,
+    ]
+]:
     repository = InMemoryDocumentRepository()
+    storage = InMemoryDocumentStorage()
     session = FakeSession()
 
     app.dependency_overrides[get_document_repository] = lambda: repository
+    app.dependency_overrides[get_document_storage] = lambda: storage
     app.dependency_overrides[get_session] = lambda: session
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client, repository, session
+        yield client, repository, storage, session
 
     app.dependency_overrides.clear()
 
@@ -73,9 +112,11 @@ def create_document(repository: InMemoryDocumentRepository) -> Document:
 
 @pytest.mark.asyncio
 async def test_create_document(
-    api_client: tuple[httpx.AsyncClient, InMemoryDocumentRepository, FakeSession],
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
 ) -> None:
-    client, repository, session = api_client
+    client, repository, _storage, session = api_client
 
     response = await client.post(
         "/api/documents",
@@ -101,9 +142,11 @@ async def test_create_document(
 
 @pytest.mark.asyncio
 async def test_list_documents(
-    api_client: tuple[httpx.AsyncClient, InMemoryDocumentRepository, FakeSession],
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
 ) -> None:
-    client, repository, _session = api_client
+    client, repository, _storage, _session = api_client
     document = create_document(repository)
 
     response = await client.get("/api/documents")
@@ -114,9 +157,11 @@ async def test_list_documents(
 
 @pytest.mark.asyncio
 async def test_get_document(
-    api_client: tuple[httpx.AsyncClient, InMemoryDocumentRepository, FakeSession],
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
 ) -> None:
-    client, repository, _session = api_client
+    client, repository, _storage, _session = api_client
     document = create_document(repository)
 
     response = await client.get(f"/api/documents/{document.id}")
@@ -127,9 +172,11 @@ async def test_get_document(
 
 @pytest.mark.asyncio
 async def test_get_document_returns_404(
-    api_client: tuple[httpx.AsyncClient, InMemoryDocumentRepository, FakeSession],
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
 ) -> None:
-    client, _repository, _session = api_client
+    client, _repository, _storage, _session = api_client
     document_id = uuid4()
 
     response = await client.get(f"/api/documents/{document_id}")
@@ -140,9 +187,11 @@ async def test_get_document_returns_404(
 
 @pytest.mark.asyncio
 async def test_activate_and_deactivate_document(
-    api_client: tuple[httpx.AsyncClient, InMemoryDocumentRepository, FakeSession],
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
 ) -> None:
-    client, repository, session = api_client
+    client, repository, _storage, session = api_client
     document = create_document(repository)
 
     deactivate_response = await client.post(f"/api/documents/{document.id}/deactivate")
@@ -153,3 +202,54 @@ async def test_activate_and_deactivate_document(
     assert activate_response.status_code == 200
     assert activate_response.json()["is_active"] is True
     assert session.commit_count == 2
+
+
+@pytest.mark.asyncio
+async def test_upload_document(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, storage, session = api_client
+
+    response = await client.post(
+        "/api/documents/upload",
+        data={
+            "document_type": "sla_policy",
+            "product_area": "support",
+            "tags": ["enterprise", "sla"],
+        },
+        files={"file": ("enterprise-sla.md", b"SLA policy content", "text/markdown")},
+    )
+
+    body = response.json()
+    assert response.status_code == 201
+    assert body["name"] == "enterprise-sla.md"
+    assert body["document_type"] == "sla_policy"
+    assert body["product_area"] == "support"
+    assert body["size_bytes"] == len(b"SLA policy content")
+    assert body["tags"] == ["enterprise", "sla"]
+    assert UUID(body["id"]) in repository.documents
+    assert storage.saved_files == [("enterprise-sla.md", "text/markdown", b"SLA policy content")]
+    assert session.commit_count == 1
+
+
+@pytest.mark.asyncio
+async def test_upload_document_returns_400_for_empty_file(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, storage, session = api_client
+
+    response = await client.post(
+        "/api/documents/upload",
+        data={"document_type": "faq", "product_area": "support"},
+        files={"file": ("empty.md", b"", "text/markdown")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["message"] == "Document file cannot be empty"
+    assert repository.documents == {}
+    assert storage.saved_files == []
+    assert session.commit_count == 0
