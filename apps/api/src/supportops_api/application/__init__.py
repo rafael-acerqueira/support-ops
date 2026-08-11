@@ -6,9 +6,11 @@ from supportops_api.application.documents import (
     DocumentNotFoundError,
     DocumentProcessor,
     DocumentRepository,
+    DocumentStorage,
     GetDocument,
     ListDocuments,
     ProcessDocument,
+    StoredDocumentFile,
 )
 
 __all__ = [
@@ -19,7 +21,9 @@ __all__ = [
     "DocumentNotFoundError",
     "DocumentProcessor",
     "DocumentRepository",
+    "DocumentStorage",
     "GetDocument",
     "ListDocuments",
     "ProcessDocument",
+    "StoredDocumentFile",
 ]

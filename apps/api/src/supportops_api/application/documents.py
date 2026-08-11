@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import BinaryIO, Protocol
 from uuid import UUID
 
 from supportops_api.domain.documents import (
@@ -37,6 +37,28 @@ class DocumentRepository(Protocol):
 
 class DocumentProcessor(Protocol):
     async def process(self, document: Document) -> list[DocumentChunk]:
+        pass
+
+
+@dataclass(frozen=True)
+class StoredDocumentFile:
+    storage_key: str
+    file_name: str
+    content_type: str
+    size_bytes: int
+
+
+class DocumentStorage(Protocol):
+    async def save(
+        self,
+        *,
+        file_name: str,
+        content_type: str,
+        content: BinaryIO,
+    ) -> StoredDocumentFile:
+        pass
+
+    async def open(self, storage_key: str) -> BinaryIO:
         pass
 
 
