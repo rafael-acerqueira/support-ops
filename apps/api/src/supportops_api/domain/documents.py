@@ -61,6 +61,7 @@ class Document:
     content_type: str
     size_bytes: int
     tags: tuple[str, ...] = field(default_factory=tuple)
+    storage_key: str | None = None
     id: UUID = field(default_factory=uuid4)
     version: str = "v1"
     status: DocumentStatus = DocumentStatus.UPLOADED
@@ -76,6 +77,7 @@ class Document:
         self.source_file_name = self.source_file_name.strip()
         self.content_type = self.content_type.strip()
         self.tags = _normalize_tags(self.tags)
+        self.storage_key = self.storage_key.strip() if self.storage_key else None
 
         if not self.name:
             raise ValueError("Document name is required")
@@ -83,6 +85,8 @@ class Document:
             raise ValueError("Source file name is required")
         if not self.content_type:
             raise ValueError("Content type is required")
+        if self.storage_key == "":
+            raise ValueError("Storage key cannot be blank")
         if self.size_bytes <= 0:
             raise ValueError("Document size must be greater than zero")
         if self.chunk_count < 0:
@@ -99,6 +103,7 @@ class Document:
         content_type: str,
         size_bytes: int,
         tags: tuple[str, ...] = (),
+        storage_key: str | None = None,
     ) -> Document:
         return cls(
             name=name,
@@ -108,6 +113,7 @@ class Document:
             content_type=content_type,
             size_bytes=size_bytes,
             tags=tags,
+            storage_key=storage_key,
         )
 
     def start_processing(self) -> None:

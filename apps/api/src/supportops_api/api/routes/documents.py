@@ -87,6 +87,7 @@ async def upload_document(
             content_type=stored_file.content_type,
             size_bytes=stored_file.size_bytes,
             tags=tuple(tags),
+            storage_key=stored_file.storage_key,
         )
     )
 

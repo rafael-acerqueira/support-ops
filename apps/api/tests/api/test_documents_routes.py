@@ -229,6 +229,7 @@ async def test_upload_document(
     assert body["product_area"] == "support"
     assert body["size_bytes"] == len(b"SLA policy content")
     assert body["tags"] == ["enterprise", "sla"]
+    assert body["storage_key"] == "fake/enterprise-sla.md"
     assert UUID(body["id"]) in repository.documents
     assert storage.saved_files == [("enterprise-sla.md", "text/markdown", b"SLA policy content")]
     assert session.commit_count == 1

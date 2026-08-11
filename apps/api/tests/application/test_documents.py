@@ -90,12 +90,14 @@ async def test_create_document_persists_uploaded_document() -> None:
             content_type="text/markdown",
             size_bytes=1024,
             tags=("refund", "enterprise"),
+            storage_key="documents/refund-policy.md",
         )
     )
 
     assert repository.documents[document.id] == document
     assert document.status == DocumentStatus.UPLOADED
     assert document.tags == ("refund", "enterprise")
+    assert document.storage_key == "documents/refund-policy.md"
 
 
 @pytest.mark.asyncio

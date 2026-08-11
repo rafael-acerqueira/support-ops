@@ -20,6 +20,7 @@ def test_document_starts_uploaded_and_normalizes_tags() -> None:
         content_type=" text/markdown ",
         size_bytes=1024,
         tags=(" Enterprise ", "refund", "", "REFUND"),
+        storage_key=" documents/refund-policy.md ",
     )
 
     assert document.name == "Refund Policy"
@@ -27,6 +28,7 @@ def test_document_starts_uploaded_and_normalizes_tags() -> None:
     assert document.version == "v1"
     assert document.is_active is True
     assert document.tags == ("enterprise", "refund")
+    assert document.storage_key == "documents/refund-policy.md"
 
 
 def test_document_moves_through_processing_and_indexed_states() -> None:

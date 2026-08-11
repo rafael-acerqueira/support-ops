@@ -28,6 +28,7 @@ class DocumentResponse(BaseModel):
     is_active: bool
     tags: list[str]
     source_file_name: str
+    storage_key: str | None
     content_type: str
     size_bytes: int
     chunk_count: int
@@ -48,6 +49,7 @@ class DocumentResponse(BaseModel):
             is_active=document.is_active,
             tags=list(document.tags),
             source_file_name=document.source_file_name,
+            storage_key=document.storage_key,
             content_type=document.content_type,
             size_bytes=document.size_bytes,
             chunk_count=document.chunk_count,

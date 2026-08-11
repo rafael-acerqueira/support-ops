@@ -71,6 +71,7 @@ class CreateDocumentInput:
     content_type: str
     size_bytes: int
     tags: tuple[str, ...] = ()
+    storage_key: str | None = None
 
 
 class CreateDocument:
@@ -86,6 +87,7 @@ class CreateDocument:
             content_type=data.content_type,
             size_bytes=data.size_bytes,
             tags=data.tags,
+            storage_key=data.storage_key,
         )
 
         await self._repository.add(document)

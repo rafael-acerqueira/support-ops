@@ -68,6 +68,7 @@ def _document_to_record(document: Document) -> DocumentRecord:
         is_active=document.is_active,
         tags=list(document.tags),
         source_file_name=document.source_file_name,
+        storage_key=document.storage_key,
         content_type=document.content_type,
         size_bytes=document.size_bytes,
         chunk_count=document.chunk_count,
@@ -87,6 +88,7 @@ def _update_document_record(record: DocumentRecord, document: Document) -> None:
     record.is_active = document.is_active
     record.tags = list(document.tags)
     record.source_file_name = document.source_file_name
+    record.storage_key = document.storage_key
     record.content_type = document.content_type
     record.size_bytes = document.size_bytes
     record.chunk_count = document.chunk_count
@@ -107,6 +109,7 @@ def _record_to_document(record: DocumentRecord) -> Document:
         is_active=record.is_active,
         tags=tuple(record.tags),
         source_file_name=record.source_file_name,
+        storage_key=record.storage_key,
         content_type=record.content_type,
         size_bytes=record.size_bytes,
         chunk_count=record.chunk_count,
