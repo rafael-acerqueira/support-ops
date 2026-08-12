@@ -56,10 +56,12 @@ async def test_inline_document_processing_queue_processes_document_immediately()
     document = create_document()
     await repository.add(document)
 
-    processed = await InlineDocumentProcessingQueue(repository, FakeDocumentProcessor()).enqueue(
+    enqueued = await InlineDocumentProcessingQueue(repository, FakeDocumentProcessor()).enqueue(
         document.id
     )
 
-    assert processed.status == DocumentStatus.INDEXED
-    assert processed.chunk_count == 1
+    assert enqueued.document_id == document.id
+    assert enqueued.task_id == f"inline:{document.id}"
+    assert repository.documents[document.id].status == DocumentStatus.INDEXED
+    assert repository.documents[document.id].chunk_count == 1
     assert repository.chunks[document.id][0].content == "Processed chunk"

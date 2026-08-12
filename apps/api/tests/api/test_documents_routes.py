@@ -12,7 +12,12 @@ from supportops_api.api.dependencies import (
     get_document_repository,
     get_document_storage,
 )
-from supportops_api.application.documents import DocumentRepository, StoredDocumentFile
+from supportops_api.application.documents import (
+    DocumentNotFoundError,
+    DocumentRepository,
+    EnqueuedDocumentProcessing,
+    StoredDocumentFile,
+)
 from supportops_api.domain.documents import (
     Document,
     DocumentChunk,
@@ -28,7 +33,7 @@ class FakeDocumentProcessingQueue:
         self._repository = repository
         self.should_fail = False
 
-    async def enqueue(self, document_id: UUID) -> Document:
+    async def enqueue(self, document_id: UUID) -> EnqueuedDocumentProcessing:
         document = await self._repository.get(document_id)
         if document is None:
             raise DocumentNotFoundError(document_id)
@@ -45,7 +50,10 @@ class FakeDocumentProcessingQueue:
         document.mark_indexed(chunk_count=len(chunks))
         await self._repository.replace_chunks(document.id, chunks)
         await self._repository.save(document)
-        return document
+        return EnqueuedDocumentProcessing(
+            document_id=document.id,
+            task_id=f"fake:{document.id}",
+        )
 
 
 class FakeSession:
@@ -309,9 +317,10 @@ async def test_process_document(
     response = await client.post(f"/api/documents/{document.id}/process")
 
     body = response.json()
-    assert response.status_code == 200
-    assert body["status"] == "indexed"
-    assert body["chunk_count"] == 2
+    assert response.status_code == 202
+    assert body["status"] == "queued"
+    assert body["task_id"] == f"fake:{document.id}"
+    assert body["document_id"] == str(document.id)
     assert repository.documents[document.id].status == DocumentStatus.INDEXED
     assert len(repository.chunks[document.id]) == 2
     assert session.commit_count == 1

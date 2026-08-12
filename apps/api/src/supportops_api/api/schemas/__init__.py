@@ -1,3 +1,7 @@
-from supportops_api.api.schemas.documents import CreateDocumentRequest, DocumentResponse
+from supportops_api.api.schemas.documents import (
+    CreateDocumentRequest,
+    DocumentProcessingResponse,
+    DocumentResponse,
+)
 
-__all__ = ["CreateDocumentRequest", "DocumentResponse"]
+__all__ = ["CreateDocumentRequest", "DocumentProcessingResponse", "DocumentResponse"]

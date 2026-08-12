@@ -58,3 +58,9 @@ class DocumentResponse(BaseModel):
             created_at=document.created_at,
             updated_at=document.updated_at,
         )
+
+
+class DocumentProcessingResponse(BaseModel):
+    document_id: UUID
+    task_id: str
+    status: str

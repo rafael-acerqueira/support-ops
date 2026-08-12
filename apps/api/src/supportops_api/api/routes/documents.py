@@ -10,7 +10,11 @@ from supportops_api.api.dependencies import (
     get_document_repository,
     get_document_storage,
 )
-from supportops_api.api.schemas import CreateDocumentRequest, DocumentResponse
+from supportops_api.api.schemas import (
+    CreateDocumentRequest,
+    DocumentProcessingResponse,
+    DocumentResponse,
+)
 from supportops_api.application.documents import (
     ActivateDocument,
     CreateDocument,
@@ -151,14 +155,18 @@ async def deactivate_document(
     return DocumentResponse.from_domain(document)
 
 
-@router.post("/{document_id}/process", response_model=DocumentResponse)
+@router.post(
+    "/{document_id}/process",
+    response_model=DocumentProcessingResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def process_document(
     document_id: UUID,
     processing_queue: DocumentProcessingQueue = Depends(get_document_processing_queue),
     session: AsyncSession = Depends(get_session),
-) -> DocumentResponse:
+) -> DocumentProcessingResponse:
     try:
-        document = await processing_queue.enqueue(document_id)
+        enqueued = await processing_queue.enqueue(document_id)
     except DocumentNotFoundError as error:
         raise _not_found_error(error) from error
     except ValueError as error:
@@ -169,4 +177,8 @@ async def process_document(
         ) from error
 
     await session.commit()
-    return DocumentResponse.from_domain(document)
+    return DocumentProcessingResponse(
+        document_id=enqueued.document_id,
+        task_id=enqueued.task_id,
+        status="queued",
+    )

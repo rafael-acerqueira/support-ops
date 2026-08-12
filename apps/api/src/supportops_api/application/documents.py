@@ -40,8 +40,14 @@ class DocumentProcessor(Protocol):
         pass
 
 
+@dataclass(frozen=True)
+class EnqueuedDocumentProcessing:
+    document_id: UUID
+    task_id: str
+
+
 class DocumentProcessingQueue(Protocol):
-    async def enqueue(self, document_id: UUID) -> Document:
+    async def enqueue(self, document_id: UUID) -> EnqueuedDocumentProcessing:
         pass
 
 
