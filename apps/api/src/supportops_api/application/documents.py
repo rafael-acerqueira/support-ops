@@ -40,6 +40,11 @@ class DocumentProcessor(Protocol):
         pass
 
 
+class DocumentProcessingQueue(Protocol):
+    async def enqueue(self, document_id: UUID) -> Document:
+        pass
+
+
 @dataclass(frozen=True)
 class StoredDocumentFile:
     storage_key: str

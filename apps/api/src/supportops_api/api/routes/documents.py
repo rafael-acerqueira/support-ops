@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from supportops_api.api.dependencies import (
-    get_document_processor,
+    get_document_processing_queue,
     get_document_repository,
     get_document_storage,
 )
@@ -17,12 +17,11 @@ from supportops_api.application.documents import (
     CreateDocumentInput,
     DeactivateDocument,
     DocumentNotFoundError,
-    DocumentProcessor,
+    DocumentProcessingQueue,
     DocumentRepository,
     DocumentStorage,
     GetDocument,
     ListDocuments,
-    ProcessDocument,
 )
 from supportops_api.domain.documents import DocumentType, ProductArea
 from supportops_api.infrastructure.database import get_session
@@ -155,12 +154,11 @@ async def deactivate_document(
 @router.post("/{document_id}/process", response_model=DocumentResponse)
 async def process_document(
     document_id: UUID,
-    repository: DocumentRepository = Depends(get_document_repository),
-    processor: DocumentProcessor = Depends(get_document_processor),
+    processing_queue: DocumentProcessingQueue = Depends(get_document_processing_queue),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentResponse:
     try:
-        document = await ProcessDocument(repository, processor).execute(document_id)
+        document = await processing_queue.enqueue(document_id)
     except DocumentNotFoundError as error:
         raise _not_found_error(error) from error
     except ValueError as error:

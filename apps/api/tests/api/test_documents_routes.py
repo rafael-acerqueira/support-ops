@@ -8,7 +8,7 @@ import pytest_asyncio
 
 from src.main import app
 from supportops_api.api.dependencies import (
-    get_document_processor,
+    get_document_processing_queue,
     get_document_repository,
     get_document_storage,
 )
@@ -23,18 +23,29 @@ from supportops_api.domain.documents import (
 from supportops_api.infrastructure.database import get_session
 
 
-class FakeDocumentProcessor:
-    def __init__(self) -> None:
+class FakeDocumentProcessingQueue:
+    def __init__(self, repository: InMemoryDocumentRepository) -> None:
+        self._repository = repository
         self.should_fail = False
 
-    async def process(self, document: Document) -> list[DocumentChunk]:
+    async def enqueue(self, document_id: UUID) -> Document:
+        document = await self._repository.get(document_id)
+        if document is None:
+            raise DocumentNotFoundError(document_id)
         if self.should_fail:
+            document.mark_failed("Document has no storage key")
+            await self._repository.save(document)
             raise ValueError("Document has no storage key")
 
-        return [
+        document.start_processing()
+        chunks = [
             DocumentChunk(document_id=document.id, chunk_index=0, content="First chunk"),
             DocumentChunk(document_id=document.id, chunk_index=1, content="Second chunk"),
         ]
+        document.mark_indexed(chunk_count=len(chunks))
+        await self._repository.replace_chunks(document.id, chunks)
+        await self._repository.save(document)
+        return document
 
 
 class FakeSession:
@@ -108,17 +119,17 @@ async def api_client() -> AsyncIterator[
 ]:
     repository = InMemoryDocumentRepository()
     storage = InMemoryDocumentStorage()
-    processor = FakeDocumentProcessor()
+    processing_queue = FakeDocumentProcessingQueue(repository)
     session = FakeSession()
 
     app.dependency_overrides[get_document_repository] = lambda: repository
     app.dependency_overrides[get_document_storage] = lambda: storage
-    app.dependency_overrides[get_document_processor] = lambda: processor
+    app.dependency_overrides[get_document_processing_queue] = lambda: processing_queue
     app.dependency_overrides[get_session] = lambda: session
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client, repository, storage, processor, session
+        yield client, repository, storage, processing_queue, session
 
     app.dependency_overrides.clear()
 
@@ -142,7 +153,7 @@ async def test_create_document(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, _processor, session = api_client
+    client, repository, _storage, _processing_queue, session = api_client
 
     response = await client.post(
         "/api/documents",
@@ -172,7 +183,7 @@ async def test_list_documents(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, _processor, _session = api_client
+    client, repository, _storage, _processing_queue, _session = api_client
     document = create_document(repository)
 
     response = await client.get("/api/documents")
@@ -187,7 +198,7 @@ async def test_get_document(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, _processor, _session = api_client
+    client, repository, _storage, _processing_queue, _session = api_client
     document = create_document(repository)
 
     response = await client.get(f"/api/documents/{document.id}")
@@ -202,7 +213,7 @@ async def test_get_document_returns_404(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, _repository, _storage, _processor, _session = api_client
+    client, _repository, _storage, _processing_queue, _session = api_client
     document_id = uuid4()
 
     response = await client.get(f"/api/documents/{document_id}")
@@ -217,7 +228,7 @@ async def test_activate_and_deactivate_document(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, _processor, session = api_client
+    client, repository, _storage, _processing_queue, session = api_client
     document = create_document(repository)
 
     deactivate_response = await client.post(f"/api/documents/{document.id}/deactivate")
@@ -236,7 +247,7 @@ async def test_upload_document(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, storage, _processor, session = api_client
+    client, repository, storage, _processing_queue, session = api_client
 
     response = await client.post(
         "/api/documents/upload",
@@ -267,7 +278,7 @@ async def test_upload_document_returns_400_for_empty_file(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, storage, _processor, session = api_client
+    client, repository, storage, _processing_queue, session = api_client
 
     response = await client.post(
         "/api/documents/upload",
@@ -288,11 +299,11 @@ async def test_process_document(
         httpx.AsyncClient,
         InMemoryDocumentRepository,
         InMemoryDocumentStorage,
-        FakeDocumentProcessor,
+        FakeDocumentProcessingQueue,
         FakeSession,
     ],
 ) -> None:
-    client, repository, _storage, _processor, session = api_client
+    client, repository, _storage, _processing_queue, session = api_client
     document = create_document(repository)
 
     response = await client.post(f"/api/documents/{document.id}/process")
@@ -312,12 +323,12 @@ async def test_process_document_returns_400_when_processing_fails(
         httpx.AsyncClient,
         InMemoryDocumentRepository,
         InMemoryDocumentStorage,
-        FakeDocumentProcessor,
+        FakeDocumentProcessingQueue,
         FakeSession,
     ],
 ) -> None:
-    client, repository, _storage, processor, session = api_client
-    processor.should_fail = True
+    client, repository, _storage, processing_queue, session = api_client
+    processing_queue.should_fail = True
     document = create_document(repository)
 
     response = await client.post(f"/api/documents/{document.id}/process")
