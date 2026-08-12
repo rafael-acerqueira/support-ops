@@ -7,10 +7,34 @@ import pytest
 import pytest_asyncio
 
 from src.main import app
-from supportops_api.api.dependencies import get_document_repository, get_document_storage
+from supportops_api.api.dependencies import (
+    get_document_processor,
+    get_document_repository,
+    get_document_storage,
+)
 from supportops_api.application.documents import DocumentRepository, StoredDocumentFile
-from supportops_api.domain.documents import Document, DocumentChunk, DocumentType, ProductArea
+from supportops_api.domain.documents import (
+    Document,
+    DocumentChunk,
+    DocumentStatus,
+    DocumentType,
+    ProductArea,
+)
 from supportops_api.infrastructure.database import get_session
+
+
+class FakeDocumentProcessor:
+    def __init__(self) -> None:
+        self.should_fail = False
+
+    async def process(self, document: Document) -> list[DocumentChunk]:
+        if self.should_fail:
+            raise ValueError("Document has no storage key")
+
+        return [
+            DocumentChunk(document_id=document.id, chunk_index=0, content="First chunk"),
+            DocumentChunk(document_id=document.id, chunk_index=1, content="Second chunk"),
+        ]
 
 
 class FakeSession:
@@ -84,15 +108,17 @@ async def api_client() -> AsyncIterator[
 ]:
     repository = InMemoryDocumentRepository()
     storage = InMemoryDocumentStorage()
+    processor = FakeDocumentProcessor()
     session = FakeSession()
 
     app.dependency_overrides[get_document_repository] = lambda: repository
     app.dependency_overrides[get_document_storage] = lambda: storage
+    app.dependency_overrides[get_document_processor] = lambda: processor
     app.dependency_overrides[get_session] = lambda: session
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client, repository, storage, session
+        yield client, repository, storage, processor, session
 
     app.dependency_overrides.clear()
 
@@ -116,7 +142,7 @@ async def test_create_document(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, session = api_client
+    client, repository, _storage, _processor, session = api_client
 
     response = await client.post(
         "/api/documents",
@@ -146,7 +172,7 @@ async def test_list_documents(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, _session = api_client
+    client, repository, _storage, _processor, _session = api_client
     document = create_document(repository)
 
     response = await client.get("/api/documents")
@@ -161,7 +187,7 @@ async def test_get_document(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, _session = api_client
+    client, repository, _storage, _processor, _session = api_client
     document = create_document(repository)
 
     response = await client.get(f"/api/documents/{document.id}")
@@ -176,7 +202,7 @@ async def test_get_document_returns_404(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, _repository, _storage, _session = api_client
+    client, _repository, _storage, _processor, _session = api_client
     document_id = uuid4()
 
     response = await client.get(f"/api/documents/{document_id}")
@@ -191,7 +217,7 @@ async def test_activate_and_deactivate_document(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, session = api_client
+    client, repository, _storage, _processor, session = api_client
     document = create_document(repository)
 
     deactivate_response = await client.post(f"/api/documents/{document.id}/deactivate")
@@ -210,7 +236,7 @@ async def test_upload_document(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, storage, session = api_client
+    client, repository, storage, _processor, session = api_client
 
     response = await client.post(
         "/api/documents/upload",
@@ -241,7 +267,7 @@ async def test_upload_document_returns_400_for_empty_file(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, storage, session = api_client
+    client, repository, storage, _processor, session = api_client
 
     response = await client.post(
         "/api/documents/upload",
@@ -254,3 +280,49 @@ async def test_upload_document_returns_400_for_empty_file(
     assert repository.documents == {}
     assert storage.saved_files == []
     assert session.commit_count == 0
+
+
+@pytest.mark.asyncio
+async def test_process_document(
+    api_client: tuple[
+        httpx.AsyncClient,
+        InMemoryDocumentRepository,
+        InMemoryDocumentStorage,
+        FakeDocumentProcessor,
+        FakeSession,
+    ],
+) -> None:
+    client, repository, _storage, _processor, session = api_client
+    document = create_document(repository)
+
+    response = await client.post(f"/api/documents/{document.id}/process")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["status"] == "indexed"
+    assert body["chunk_count"] == 2
+    assert repository.documents[document.id].status == DocumentStatus.INDEXED
+    assert len(repository.chunks[document.id]) == 2
+    assert session.commit_count == 1
+
+
+@pytest.mark.asyncio
+async def test_process_document_returns_400_when_processing_fails(
+    api_client: tuple[
+        httpx.AsyncClient,
+        InMemoryDocumentRepository,
+        InMemoryDocumentStorage,
+        FakeDocumentProcessor,
+        FakeSession,
+    ],
+) -> None:
+    client, repository, _storage, processor, session = api_client
+    processor.should_fail = True
+    document = create_document(repository)
+
+    response = await client.post(f"/api/documents/{document.id}/process")
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["message"] == "Document has no storage key"
+    assert repository.documents[document.id].status == DocumentStatus.FAILED
+    assert session.commit_count == 1

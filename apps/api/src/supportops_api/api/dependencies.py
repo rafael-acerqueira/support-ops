@@ -3,9 +3,14 @@ from __future__ import annotations
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from supportops_api.application.documents import DocumentRepository, DocumentStorage
+from supportops_api.application.documents import (
+    DocumentProcessor,
+    DocumentRepository,
+    DocumentStorage,
+)
 from supportops_api.infrastructure.database import get_session
 from supportops_api.infrastructure.persistence import PostgresDocumentRepository
+from supportops_api.infrastructure.processing import BasicDocumentProcessor
 from supportops_api.infrastructure.storage import get_local_document_storage
 
 
@@ -17,3 +22,9 @@ def get_document_repository(
 
 def get_document_storage() -> DocumentStorage:
     return get_local_document_storage()
+
+
+def get_document_processor(
+    storage: DocumentStorage = Depends(get_document_storage),
+) -> DocumentProcessor:
+    return BasicDocumentProcessor(storage)
