@@ -12,7 +12,7 @@ from supportops_api.application.documents import (
 from supportops_api.infrastructure.database import get_session
 from supportops_api.infrastructure.persistence import PostgresDocumentRepository
 from supportops_api.infrastructure.processing import BasicDocumentProcessor
-from supportops_api.infrastructure.queues import InlineDocumentProcessingQueue
+from supportops_api.infrastructure.queues import CeleryDocumentProcessingQueue
 from supportops_api.infrastructure.storage import get_local_document_storage
 
 
@@ -34,6 +34,5 @@ def get_document_processor(
 
 def get_document_processing_queue(
     repository: DocumentRepository = Depends(get_document_repository),
-    processor: DocumentProcessor = Depends(get_document_processor),
 ) -> DocumentProcessingQueue:
-    return InlineDocumentProcessingQueue(repository, processor)
+    return CeleryDocumentProcessingQueue(repository)

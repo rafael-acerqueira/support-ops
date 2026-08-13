@@ -11,7 +11,11 @@ redis_port = os.getenv("REDIS_PORT", "6379")
 redis_db = os.getenv("REDIS_DB", "0")
 broker_url = f"redis://{redis_host}:{redis_port}/{redis_db}"
 
-celery_app = Celery("supportops_workers", broker=broker_url)
+celery_app = Celery(
+    "supportops_workers",
+    broker=broker_url,
+    include=["src.supportops_workers.tasks.documents"],
+)
 
 # Example configuration; adjust in production
 celery_app.conf.update(
@@ -19,3 +23,6 @@ celery_app.conf.update(
     accept_content=["json"],
     result_serializer="json",
 )
+
+# Import task modules so tasks are registered when celery_app is imported.
+from src.supportops_workers.tasks import documents  # noqa: E402,F401

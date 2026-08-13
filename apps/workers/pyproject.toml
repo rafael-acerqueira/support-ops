@@ -10,6 +10,7 @@ authors = [{name = "Your Name", email = "you@example.com"}]
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "supportops-api",
     "celery>=5.3.0",
     "redis>=5.0.0",
     "pydantic>=2.0",
@@ -40,6 +41,9 @@ dev = [
 
 [tool.uv]
 
+[tool.uv.sources]
+supportops-api = { path = "../api", editable = true }
+
 [tool.black]
 line-length = 100
 target-version = ['py311']
@@ -55,4 +59,8 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+python_files = "test_*.py"
 asyncio_mode = "auto"
+markers = [
+    "integration: tests that require external services",
+]
