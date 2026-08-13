@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "concurrently \"npm:dev:web\" \"npm:dev:api\" \"npm:dev:workers\"",
     "dev:web": "cd apps/web && pnpm run dev",
-    "dev:api": "cd apps/api && uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000",
-    "dev:workers": "cd apps/workers && uv run celery -A src.celery_app worker --loglevel=info",
+    "dev:api": "cd apps/api && DOCUMENT_STORAGE_PATH=../../.var/documents uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:workers": "cd apps/workers && DOCUMENT_STORAGE_PATH=../../.var/documents uv run celery -A src.celery_app worker --loglevel=info",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
