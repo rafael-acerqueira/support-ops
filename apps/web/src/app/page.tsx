@@ -5,11 +5,13 @@ import {
   CheckCircle,
   Clock,
   FileText,
+  History,
   Loader2,
   Power,
   PowerOff,
   RefreshCw,
   Upload,
+  X,
 } from 'lucide-react';
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -112,6 +114,7 @@ export default function DocumentsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [busyDocumentId, setBusyDocumentId] = useState<string | null>(null);
   const [watchedDocumentIds, setWatchedDocumentIds] = useState<string[]>([]);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,6 +131,10 @@ export default function DocumentsPage() {
     [documents]
   );
   const isPolling = watchedDocumentIds.length > 0;
+  const selectedDocument = useMemo(
+    () => documents.find((document) => document.id === selectedDocumentId) ?? null,
+    [documents, selectedDocumentId]
+  );
 
   const watchDocument = useCallback((documentId: string) => {
     setWatchedDocumentIds((current) =>
@@ -144,6 +151,9 @@ export default function DocumentsPage() {
 
       const nextDocuments = (await response.json()) as KnowledgeDocument[];
       setDocuments(nextDocuments);
+      setSelectedDocumentId((current) =>
+        current && nextDocuments.some((document) => document.id === current) ? current : null
+      );
       setWatchedDocumentIds((current) =>
         current.filter((documentId) => {
           const document = nextDocuments.find((item) => item.id === documentId);
@@ -250,6 +260,9 @@ export default function DocumentsPage() {
       setBusyDocumentId(null);
     }
   }
+
+  const SelectedStatusIcon = selectedDocument ? statusIcons[selectedDocument.status] : null;
+  const selectedIsBusy = selectedDocument ? busyDocumentId === selectedDocument.id : false;
 
   return (
     <main className="shell">
@@ -398,7 +411,22 @@ export default function DocumentsPage() {
                     const isBusy = busyDocumentId === document.id;
 
                     return (
-                      <tr key={document.id}>
+                      <tr
+                        className={
+                          selectedDocumentId === document.id
+                            ? 'document-row selected'
+                            : 'document-row'
+                        }
+                        key={document.id}
+                        onClick={() => setSelectedDocumentId(document.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setSelectedDocumentId(document.id);
+                          }
+                        }}
+                        tabIndex={0}
+                      >
                         <td>
                           <div className="document-name">
                             <FileText size={18} aria-hidden="true" />
@@ -428,7 +456,10 @@ export default function DocumentsPage() {
                             <button
                               className="icon-button small"
                               type="button"
-                              onClick={() => postDocumentAction(document.id, 'process')}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void postDocumentAction(document.id, 'process');
+                              }}
                               disabled={isBusy}
                               title="Reprocess"
                             >
@@ -441,12 +472,13 @@ export default function DocumentsPage() {
                             <button
                               className="icon-button small"
                               type="button"
-                              onClick={() =>
-                                postDocumentAction(
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void postDocumentAction(
                                   document.id,
                                   document.is_active ? 'deactivate' : 'activate'
-                                )
-                              }
+                                );
+                              }}
                               disabled={isBusy}
                               title={document.is_active ? 'Deactivate' : 'Activate'}
                             >
@@ -476,6 +508,172 @@ export default function DocumentsPage() {
               </table>
             </div>
           </section>
+
+          <aside className="detail-panel" aria-labelledby="detail-title">
+            {selectedDocument && SelectedStatusIcon ? (
+              <>
+                <div className="detail-header">
+                  <div className="detail-title-group">
+                    <span className="icon-frame" aria-hidden="true">
+                      <FileText size={20} />
+                    </span>
+                    <div>
+                      <p className="eyebrow">Document detail</p>
+                      <h2 id="detail-title">{selectedDocument.name}</h2>
+                    </div>
+                  </div>
+                  <button
+                    className="icon-button small"
+                    type="button"
+                    onClick={() => setSelectedDocumentId(null)}
+                    title="Close detail"
+                  >
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                </div>
+
+                <div className="detail-actions">
+                  <button
+                    className="primary-button compact"
+                    type="button"
+                    onClick={() => void postDocumentAction(selectedDocument.id, 'process')}
+                    disabled={selectedIsBusy}
+                  >
+                    {selectedIsBusy ? (
+                      <Loader2 className="spin" size={16} aria-hidden="true" />
+                    ) : (
+                      <RefreshCw size={16} aria-hidden="true" />
+                    )}
+                    Reprocess
+                  </button>
+                  <button
+                    className="secondary-button compact"
+                    type="button"
+                    onClick={() =>
+                      void postDocumentAction(
+                        selectedDocument.id,
+                        selectedDocument.is_active ? 'deactivate' : 'activate'
+                      )
+                    }
+                    disabled={selectedIsBusy}
+                  >
+                    {selectedDocument.is_active ? (
+                      <PowerOff size={16} aria-hidden="true" />
+                    ) : (
+                      <Power size={16} aria-hidden="true" />
+                    )}
+                    {selectedDocument.is_active ? 'Deactivate' : 'Activate'}
+                  </button>
+                </div>
+
+                <dl className="detail-grid">
+                  <div>
+                    <dt>Status</dt>
+                    <dd>
+                      <span className={`status-badge ${selectedDocument.status}`}>
+                        <SelectedStatusIcon
+                          className={selectedDocument.status === 'processing' ? 'spin' : undefined}
+                          size={14}
+                          aria-hidden="true"
+                        />
+                        {statusLabels[selectedDocument.status]}
+                      </span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Version</dt>
+                    <dd>{selectedDocument.version}</dd>
+                  </div>
+                  <div>
+                    <dt>Type</dt>
+                    <dd>{humanize(selectedDocument.document_type)}</dd>
+                  </div>
+                  <div>
+                    <dt>Area</dt>
+                    <dd>{humanize(selectedDocument.product_area)}</dd>
+                  </div>
+                  <div>
+                    <dt>Active</dt>
+                    <dd>{selectedDocument.is_active ? 'Yes' : 'No'}</dd>
+                  </div>
+                  <div>
+                    <dt>Chunks</dt>
+                    <dd>{selectedDocument.chunk_count}</dd>
+                  </div>
+                  <div>
+                    <dt>Content type</dt>
+                    <dd>{selectedDocument.content_type}</dd>
+                  </div>
+                  <div>
+                    <dt>Size</dt>
+                    <dd>{formatBytes(selectedDocument.size_bytes)}</dd>
+                  </div>
+                  <div>
+                    <dt>Source file</dt>
+                    <dd>{selectedDocument.source_file_name}</dd>
+                  </div>
+                  <div>
+                    <dt>Storage key</dt>
+                    <dd className="mono-value">{selectedDocument.storage_key ?? '-'}</dd>
+                  </div>
+                  <div>
+                    <dt>Created</dt>
+                    <dd>{formatDate(selectedDocument.created_at)}</dd>
+                  </div>
+                  <div>
+                    <dt>Updated</dt>
+                    <dd>{formatDate(selectedDocument.updated_at)}</dd>
+                  </div>
+                  <div>
+                    <dt>Last processed</dt>
+                    <dd>{formatDate(selectedDocument.last_processed_at)}</dd>
+                  </div>
+                  {selectedDocument.failure_reason && (
+                    <div>
+                      <dt>Failure reason</dt>
+                      <dd>{selectedDocument.failure_reason}</dd>
+                    </div>
+                  )}
+                </dl>
+
+                <section className="detail-section" aria-labelledby="tags-title">
+                  <h3 id="tags-title">Tags</h3>
+                  <div className="tag-list">
+                    {selectedDocument.tags.length > 0 ? (
+                      selectedDocument.tags.map((tag) => <span key={tag}>{tag}</span>)
+                    ) : (
+                      <span>No tags</span>
+                    )}
+                  </div>
+                </section>
+
+                <section className="detail-section" aria-labelledby="versions-title">
+                  <div className="section-title-row">
+                    <div>
+                      <h3 id="versions-title">Versions</h3>
+                      <p>
+                        Version history will be available when document versioning is implemented.
+                      </p>
+                    </div>
+                    <button className="secondary-button compact" type="button" disabled>
+                      <History size={16} aria-hidden="true" />
+                      View versions
+                    </button>
+                  </div>
+                  <div className="version-row">
+                    <span>{selectedDocument.version}</span>
+                    <strong>Current</strong>
+                  </div>
+                </section>
+              </>
+            ) : (
+              <div className="detail-empty">
+                <FileText size={24} aria-hidden="true" />
+                <h2 id="detail-title">Document detail</h2>
+                <p>Select a document to inspect metadata, processing state, and version context.</p>
+              </div>
+            )}
+          </aside>
         </section>
       </section>
     </main>
