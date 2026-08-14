@@ -1,5 +1,7 @@
 # SupportOps
 
+[![CI](https://github.com/rafael-acerqueira/customer-support/actions/workflows/ci.yml/badge.svg)](https://github.com/rafael-acerqueira/customer-support/actions/workflows/ci.yml)
+
 SupportOps is a customer support operations platform for B2B SaaS teams.
 
 It helps support agents triage tickets, retrieve trusted internal knowledge, generate policy-aware response drafts, review AI-assisted suggestions, and measure response quality through evaluation datasets and observability.
@@ -75,7 +77,7 @@ supportops/
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22.13+
 - Python 3.11+
 - Docker & Docker Compose plugin (`docker compose`)
 - pnpm (install: `npm i -g pnpm`)

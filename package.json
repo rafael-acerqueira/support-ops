@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "concurrently \"npm:dev:web\" \"npm:dev:api\" \"npm:dev:workers\"",
     "dev:web": "cd apps/web && pnpm run dev",
-    "dev:api": "cd apps/api && uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000",
-    "dev:workers": "cd apps/workers && uv run celery -A src.celery_app worker --loglevel=info",
+    "dev:api": "cd apps/api && DOCUMENT_STORAGE_PATH=../../.var/documents uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:workers": "cd apps/workers && DOCUMENT_STORAGE_PATH=../../.var/documents uv run celery -A src.celery_app worker --loglevel=info",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
@@ -18,7 +18,10 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f"
+    "docker:logs": "docker compose logs -f",
+    "db:migrate": "cd apps/api && uv run alembic -c alembic.ini upgrade head",
+    "db:rollback": "cd apps/api && uv run alembic -c alembic.ini downgrade -1",
+    "db:current": "cd apps/api && uv run alembic -c alembic.ini current"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
@@ -29,6 +32,6 @@
     "apps/*"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.13.0"
   }
 }

@@ -11,14 +11,13 @@ RUN apt-get update && apt-get install -y \
 # Install uv
 RUN pip install uv
 
-# Copy pyproject.toml and uv.lock
-COPY apps/workers/pyproject.toml ./
-COPY apps/workers/uv.lock* ./
+# Copy local Python packages required by the worker
+COPY apps/api /app/apps/api
+COPY apps/workers /app/apps/workers
+
+WORKDIR /app/apps/workers
 
 # Install dependencies
 RUN uv sync --frozen
-
-# Copy source code
-COPY apps/workers/src ./src
 
 CMD ["celery", "-A", "src.celery_app", "worker", "--loglevel=info"]
