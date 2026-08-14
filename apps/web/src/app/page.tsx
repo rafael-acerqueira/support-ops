@@ -4,6 +4,7 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  Eye,
   FileText,
   History,
   Loader2,
@@ -453,6 +454,17 @@ export default function DocumentsPage() {
                         <td>{formatDate(document.updated_at)}</td>
                         <td>
                           <div className="actions">
+                            <button
+                              className="icon-button small"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedDocumentId(document.id);
+                              }}
+                              title="View details"
+                            >
+                              <Eye size={16} aria-hidden="true" />
+                            </button>
                             <button
                               className="icon-button small"
                               type="button"
