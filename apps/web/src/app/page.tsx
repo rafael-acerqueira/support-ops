@@ -11,7 +11,7 @@ import {
   RefreshCw,
   Upload,
 } from 'lucide-react';
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 type DocumentStatus = 'uploaded' | 'processing' | 'indexed' | 'failed';
 type DocumentType =
@@ -111,6 +111,7 @@ export default function DocumentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [busyDocumentId, setBusyDocumentId] = useState<string | null>(null);
+  const [watchedDocumentIds, setWatchedDocumentIds] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,24 +127,49 @@ export default function DocumentsPage() {
     () => documents.filter((document) => document.is_active).length,
     [documents]
   );
+  const isPolling = watchedDocumentIds.length > 0;
 
-  async function loadDocuments() {
-    setError(null);
+  const watchDocument = useCallback((documentId: string) => {
+    setWatchedDocumentIds((current) =>
+      current.includes(documentId) ? current : [...current, documentId]
+    );
+  }, []);
+
+  const loadDocuments = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setError(null);
 
     try {
       const response = await fetch('/api/documents', { cache: 'no-store' });
       if (!response.ok) throw new Error('Unable to load documents.');
-      setDocuments(await response.json());
+
+      const nextDocuments = (await response.json()) as KnowledgeDocument[];
+      setDocuments(nextDocuments);
+      setWatchedDocumentIds((current) =>
+        current.filter((documentId) => {
+          const document = nextDocuments.find((item) => item.id === documentId);
+          return document ? !['indexed', 'failed'].includes(document.status) : false;
+        })
+      );
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unexpected error while loading.');
     } finally {
       setIsLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadDocuments();
-  }, []);
+  }, [loadDocuments]);
+
+  useEffect(() => {
+    if (!isPolling) return;
+
+    const intervalId = window.setInterval(() => {
+      void loadDocuments({ silent: true });
+    }, 1500);
+
+    return () => window.clearInterval(intervalId);
+  }, [isPolling, loadDocuments]);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     setFile(event.target.files?.[0] ?? null);
@@ -203,8 +229,17 @@ export default function DocumentsPage() {
       const response = await fetch(`/api/documents/${documentId}/${action}`, { method: 'POST' });
       if (!response.ok) throw new Error('The API could not complete the action.');
 
+      if (action === 'process') {
+        watchDocument(documentId);
+        setDocuments((current) =>
+          current.map((document) =>
+            document.id === documentId ? { ...document, status: 'processing' } : document
+          )
+        );
+      }
+
       setMessage(action === 'process' ? 'Processing queued.' : 'Document updated.');
-      await loadDocuments();
+      await loadDocuments({ silent: action === 'process' });
     } catch (actionError) {
       setError(
         actionError instanceof Error
@@ -232,7 +267,7 @@ export default function DocumentsPage() {
           <button
             className="icon-button"
             type="button"
-            onClick={loadDocuments}
+            onClick={() => void loadDocuments()}
             title="Refresh list"
           >
             <RefreshCw size={18} aria-hidden="true" />
@@ -329,7 +364,7 @@ export default function DocumentsPage() {
                 <h2 id="documents-title">Registered documents</h2>
                 <p>{isLoading ? 'Loading records' : `${documents.length} records`}</p>
               </div>
-              <span className="environment">development</span>
+              <span className="environment">{isPolling ? 'syncing' : 'development'}</span>
             </div>
 
             {(message || error) && (
