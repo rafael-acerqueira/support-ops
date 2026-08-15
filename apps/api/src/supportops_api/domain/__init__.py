@@ -5,6 +5,11 @@ from supportops_api.domain.documents import (
     DocumentType,
     ProductArea,
 )
+from supportops_api.domain.tickets import (
+    Ticket,
+    TicketPriority,
+    TicketStatus,
+)
 
 __all__ = [
     "Document",
@@ -12,4 +17,7 @@ __all__ = [
     "DocumentStatus",
     "DocumentType",
     "ProductArea",
+    "Ticket",
+    "TicketPriority",
+    "TicketStatus",
 ]
