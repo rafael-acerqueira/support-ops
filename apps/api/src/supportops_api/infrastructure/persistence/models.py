@@ -15,6 +15,26 @@ class Base(DeclarativeBase):
     pass
 
 
+class TicketRecord(Base):
+    __tablename__ = "tickets"
+
+    id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True)
+    external_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    customer_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    customer_tier: Mapped[str] = mapped_column(String(64), nullable=False)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    product_area: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    priority: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class DocumentRecord(Base):
     __tablename__ = "documents"
 
