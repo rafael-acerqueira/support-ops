@@ -3,5 +3,19 @@ from supportops_api.api.schemas.documents import (
     DocumentProcessingResponse,
     DocumentResponse,
 )
+from supportops_api.api.schemas.tickets import (
+    CreateTicketRequest,
+    TicketResponse,
+    UpdateTicketPriorityRequest,
+    UpdateTicketStatusRequest,
+)
 
-__all__ = ["CreateDocumentRequest", "DocumentProcessingResponse", "DocumentResponse"]
+__all__ = [
+    "CreateDocumentRequest",
+    "CreateTicketRequest",
+    "DocumentProcessingResponse",
+    "DocumentResponse",
+    "TicketResponse",
+    "UpdateTicketPriorityRequest",
+    "UpdateTicketStatusRequest",
+]
