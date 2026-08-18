@@ -5,7 +5,11 @@ from supportops_api.infrastructure.persistence.models import (
     Base,
     DocumentChunkRecord,
     DocumentRecord,
+    SuggestedResponseRecord,
     TicketRecord,
+)
+from supportops_api.infrastructure.persistence.response_suggestion_repository import (
+    PostgresResponseSuggestionRepository,
 )
 from supportops_api.infrastructure.persistence.ticket_repository import (
     PostgresTicketRepository,
@@ -16,6 +20,8 @@ __all__ = [
     "DocumentChunkRecord",
     "DocumentRecord",
     "PostgresDocumentRepository",
+    "PostgresResponseSuggestionRepository",
     "PostgresTicketRepository",
+    "SuggestedResponseRecord",
     "TicketRecord",
 ]
