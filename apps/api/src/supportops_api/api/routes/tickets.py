@@ -5,12 +5,27 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from supportops_api.api.dependencies import get_ticket_repository
+from supportops_api.api.dependencies import (
+    get_response_suggestion_generator,
+    get_response_suggestion_repository,
+    get_ticket_repository,
+)
 from supportops_api.api.schemas import (
     CreateTicketRequest,
+    SuggestedResponseResponse,
     TicketResponse,
     UpdateTicketPriorityRequest,
     UpdateTicketStatusRequest,
+)
+from supportops_api.application.response_suggestions import (
+    ApproveSuggestedResponse,
+    GenerateSuggestedResponse,
+    GenerateSuggestedResponseInput,
+    ListSuggestedResponses,
+    RejectSuggestedResponse,
+    ResponseSuggestionGenerator,
+    ResponseSuggestionRepository,
+    SuggestedResponseNotFoundError,
 )
 from supportops_api.application.tickets import (
     ChangeTicketPriority,
@@ -31,6 +46,16 @@ def _not_found_error(error: TicketNotFoundError) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail={"message": "Ticket not found", "ticket_id": str(error.ticket_id)},
+    )
+
+
+def _suggestion_not_found_error(error: SuggestedResponseNotFoundError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={
+            "message": "Suggested response not found",
+            "suggestion_id": str(error.suggestion_id),
+        },
     )
 
 
@@ -107,3 +132,84 @@ async def update_ticket_status(
 
     await session.commit()
     return TicketResponse.from_domain(ticket)
+
+
+@router.post(
+    "/{ticket_id}/suggested-responses",
+    response_model=SuggestedResponseResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def generate_suggested_response(
+    ticket_id: UUID,
+    ticket_repository: TicketRepository = Depends(get_ticket_repository),
+    suggestion_repository: ResponseSuggestionRepository = Depends(
+        get_response_suggestion_repository
+    ),
+    generator: ResponseSuggestionGenerator = Depends(get_response_suggestion_generator),
+    session: AsyncSession = Depends(get_session),
+) -> SuggestedResponseResponse:
+    try:
+        suggestion = await GenerateSuggestedResponse(
+            ticket_repository, suggestion_repository, generator
+        ).execute(GenerateSuggestedResponseInput(ticket_id=ticket_id))
+    except TicketNotFoundError as error:
+        raise _not_found_error(error) from error
+
+    await session.commit()
+    return SuggestedResponseResponse.from_domain(suggestion)
+
+
+@router.get("/{ticket_id}/suggested-responses", response_model=list[SuggestedResponseResponse])
+async def list_suggested_responses(
+    ticket_id: UUID,
+    ticket_repository: TicketRepository = Depends(get_ticket_repository),
+    suggestion_repository: ResponseSuggestionRepository = Depends(
+        get_response_suggestion_repository
+    ),
+) -> list[SuggestedResponseResponse]:
+    try:
+        suggestions = await ListSuggestedResponses(
+            ticket_repository, suggestion_repository
+        ).execute(ticket_id)
+    except TicketNotFoundError as error:
+        raise _not_found_error(error) from error
+
+    return [SuggestedResponseResponse.from_domain(suggestion) for suggestion in suggestions]
+
+
+@router.patch(
+    "/{ticket_id}/suggested-responses/{suggestion_id}/approve",
+    response_model=SuggestedResponseResponse,
+)
+async def approve_suggested_response(
+    ticket_id: UUID,
+    suggestion_id: UUID,
+    repository: ResponseSuggestionRepository = Depends(get_response_suggestion_repository),
+    session: AsyncSession = Depends(get_session),
+) -> SuggestedResponseResponse:
+    try:
+        suggestion = await ApproveSuggestedResponse(repository).execute(ticket_id, suggestion_id)
+    except SuggestedResponseNotFoundError as error:
+        raise _suggestion_not_found_error(error) from error
+
+    await session.commit()
+    return SuggestedResponseResponse.from_domain(suggestion)
+
+
+@router.patch(
+    "/{ticket_id}/suggested-responses/{suggestion_id}/reject",
+    response_model=SuggestedResponseResponse,
+)
+async def reject_suggested_response(
+    ticket_id: UUID,
+    suggestion_id: UUID,
+    repository: ResponseSuggestionRepository = Depends(get_response_suggestion_repository),
+    session: AsyncSession = Depends(get_session),
+) -> SuggestedResponseResponse:
+    try:
+        suggestion = await RejectSuggestedResponse(repository).execute(ticket_id, suggestion_id)
+    except SuggestedResponseNotFoundError as error:
+        raise _suggestion_not_found_error(error) from error
+
+    await session.commit()
+    return SuggestedResponseResponse.from_domain(suggestion)
