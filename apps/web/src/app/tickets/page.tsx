@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, CheckCircle, Clock, RefreshCw, Ticket } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, RefreshCw, Search, Ticket } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -13,6 +13,7 @@ type TicketStatus =
   | 'closed';
 type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 type ProductArea = 'billing' | 'security' | 'support' | 'api' | 'product' | 'legal';
+type FilterValue = 'all' | string;
 
 type SupportTicket = {
   id: string;
@@ -53,6 +54,9 @@ const statusIcons = {
   closed: CheckCircle,
 };
 
+const statusOptions = Object.entries(statusLabels) as Array<[TicketStatus, string]>;
+const priorityOptions = Object.entries(priorityLabels) as Array<[TicketPriority, string]>;
+
 function formatDate(value: string | null) {
   if (!value) return '-';
 
@@ -74,20 +78,53 @@ function humanize(value: string) {
 
 export default function TicketsPage() {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [statusFilter, setStatusFilter] = useState<FilterValue>('all');
+  const [priorityFilter, setPriorityFilter] = useState<FilterValue>('all');
+  const [categoryFilter, setCategoryFilter] = useState<FilterValue>('all');
+  const [planFilter, setPlanFilter] = useState<FilterValue>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const openCount = useMemo(
-    () => tickets.filter((ticket) => ticket.status === 'open').length,
+  const categoryOptions = useMemo(
+    () => Array.from(new Set(tickets.map((ticket) => ticket.product_area))).sort(),
     [tickets]
+  );
+  const planOptions = useMemo(
+    () => Array.from(new Set(tickets.map((ticket) => ticket.customer_tier))).sort(),
+    [tickets]
+  );
+
+  const filteredTickets = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return tickets.filter((ticket) => {
+      const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
+      const matchesPriority = priorityFilter === 'all' || ticket.priority === priorityFilter;
+      const matchesCategory = categoryFilter === 'all' || ticket.product_area === categoryFilter;
+      const matchesPlan = planFilter === 'all' || ticket.customer_tier === planFilter;
+      const matchesSearch =
+        !query ||
+        [ticket.external_id, ticket.customer_name, ticket.subject, ticket.description]
+          .join(' ')
+          .toLowerCase()
+          .includes(query);
+
+      return matchesStatus && matchesPriority && matchesCategory && matchesPlan && matchesSearch;
+    });
+  }, [categoryFilter, planFilter, priorityFilter, searchQuery, statusFilter, tickets]);
+
+  const openCount = useMemo(
+    () => filteredTickets.filter((ticket) => ticket.status === 'open').length,
+    [filteredTickets]
   );
   const triagedCount = useMemo(
-    () => tickets.filter((ticket) => ticket.status === 'triaged').length,
-    [tickets]
+    () => filteredTickets.filter((ticket) => ticket.status === 'triaged').length,
+    [filteredTickets]
   );
   const urgentOrHighCount = useMemo(
-    () => tickets.filter((ticket) => ['urgent', 'high'].includes(ticket.priority)).length,
-    [tickets]
+    () => filteredTickets.filter((ticket) => ['urgent', 'high'].includes(ticket.priority)).length,
+    [filteredTickets]
   );
 
   const loadTickets = useCallback(async () => {
@@ -138,7 +175,7 @@ export default function TicketsPage() {
         <section className="metrics" aria-label="Tickets summary">
           <div className="metric">
             <span>Total</span>
-            <strong>{tickets.length}</strong>
+            <strong>{filteredTickets.length}</strong>
           </div>
           <div className="metric">
             <span>Open</span>
@@ -159,7 +196,11 @@ export default function TicketsPage() {
             <div className="panel-heading">
               <div>
                 <h2 id="tickets-title">Ticket queue</h2>
-                <p>{isLoading ? 'Loading records' : `${tickets.length} records`}</p>
+                <p>
+                  {isLoading
+                    ? 'Loading records'
+                    : `${filteredTickets.length} of ${tickets.length} records`}
+                </p>
               </div>
               <span className="environment">development</span>
             </div>
@@ -171,21 +212,89 @@ export default function TicketsPage() {
               </div>
             )}
 
+            <div className="ticket-controls" aria-label="Ticket filters">
+              <label className="field compact-field">
+                <span>Status</span>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="all">All</option>
+                  {statusOptions.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field compact-field">
+                <span>Priority</span>
+                <select
+                  value={priorityFilter}
+                  onChange={(event) => setPriorityFilter(event.target.value)}
+                >
+                  <option value="all">All</option>
+                  {priorityOptions.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field compact-field">
+                <span>Category</span>
+                <select
+                  value={categoryFilter}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                >
+                  <option value="all">All</option>
+                  {categoryOptions.map((category) => (
+                    <option key={category} value={category}>
+                      {humanize(category)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field compact-field">
+                <span>Plan</span>
+                <select value={planFilter} onChange={(event) => setPlanFilter(event.target.value)}>
+                  <option value="all">All</option>
+                  {planOptions.map((plan) => (
+                    <option key={plan} value={plan}>
+                      {humanize(plan)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label className="search-field">
+              <Search size={18} aria-hidden="true" />
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search by customer, subject, ticket id, or content"
+              />
+            </label>
+
             <div className="table-wrap">
               <table className="tickets-table">
                 <thead>
                   <tr>
                     <th>Ticket</th>
                     <th>Customer</th>
-                    <th>Tier</th>
-                    <th>Area</th>
+                    <th>Plan</th>
+                    <th>Category</th>
                     <th>Status</th>
                     <th>Priority</th>
                     <th>Updated</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {tickets.map((ticket) => {
+                  {filteredTickets.map((ticket) => {
                     const StatusIcon = statusIcons[ticket.status];
 
                     return (
@@ -218,12 +327,16 @@ export default function TicketsPage() {
                     );
                   })}
 
-                  {!isLoading && tickets.length === 0 && (
+                  {!isLoading && filteredTickets.length === 0 && (
                     <tr>
                       <td colSpan={7}>
                         <div className="empty-state">
                           <Ticket size={24} aria-hidden="true" />
-                          <strong>No tickets registered</strong>
+                          <strong>
+                            {tickets.length === 0
+                              ? 'No tickets registered'
+                              : 'No tickets match the current filters'}
+                          </strong>
                         </div>
                       </td>
                     </tr>

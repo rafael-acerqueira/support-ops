@@ -806,6 +806,57 @@ tbody tr:last-child td {
   color: #fca5a5;
 }
 
+.ticket-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 12px;
+  border-top: 1px solid #475569;
+  padding: 16px 20px 0;
+}
+
+.compact-field {
+  gap: 6px;
+}
+
+.compact-field select {
+  min-height: 40px;
+  padding: 8px 10px;
+}
+
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 20px 20px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #cbd5e1;
+  padding: 0 12px;
+}
+
+.search-field:focus-within {
+  border-color: #7c3aed;
+}
+
+.search-field svg {
+  flex: 0 0 auto;
+  color: #0ea5e9;
+}
+
+.search-field input {
+  min-height: 44px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #f1f5f9;
+  outline: none;
+}
+
+.search-field input::placeholder {
+  color: #64748b;
+}
+
 @media (max-width: 1180px) {
   .document-layout {
     grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
@@ -838,6 +889,10 @@ tbody tr:last-child td {
   .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .ticket-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 520px) {
@@ -857,14 +912,20 @@ tbody tr:last-child td {
     font-size: 14px;
   }
 
-  .metrics {
+  .metrics,
+  .ticket-controls {
     grid-template-columns: 1fr;
   }
 
   .upload-panel,
   .panel-heading,
-  .detail-panel {
+  .detail-panel,
+  .ticket-controls {
     padding: 16px;
+  }
+
+  .search-field {
+    margin: 16px;
   }
 
   .detail-actions,
