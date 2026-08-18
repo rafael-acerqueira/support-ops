@@ -23,8 +23,19 @@ type TicketStatus =
   | 'resolved'
   | 'closed';
 type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
+type SuggestedResponseStatus = 'draft' | 'approved' | 'rejected';
 type ProductArea = 'billing' | 'security' | 'support' | 'api' | 'product' | 'legal';
 type FilterValue = 'all' | string;
+
+type SuggestedResponse = {
+  id: string;
+  ticket_id: string;
+  content: string;
+  status: SuggestedResponseStatus;
+  sources: Array<Record<string, unknown>>;
+  created_at: string;
+  updated_at: string;
+};
 
 type SupportTicket = {
   id: string;
@@ -54,6 +65,12 @@ const priorityLabels: Record<TicketPriority, string> = {
   normal: 'Normal',
   high: 'High',
   urgent: 'Urgent',
+};
+
+const suggestedResponseStatusLabels: Record<SuggestedResponseStatus, string> = {
+  draft: 'Draft',
+  approved: 'Approved',
+  rejected: 'Rejected',
 };
 
 const statusIcons = {
@@ -95,8 +112,11 @@ export default function TicketsPage() {
   const [planFilter, setPlanFilter] = useState<FilterValue>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [suggestedResponses, setSuggestedResponses] = useState<SuggestedResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
 
   const categoryOptions = useMemo(
     () => Array.from(new Set(tickets.map((ticket) => ticket.product_area))).sort(),
@@ -143,6 +163,7 @@ export default function TicketsPage() {
     [selectedTicketId, tickets]
   );
   const SelectedStatusIcon = selectedTicket ? statusIcons[selectedTicket.status] : null;
+  const latestSuggestedResponse = suggestedResponses[0] ?? null;
 
   const loadTickets = useCallback(async () => {
     setError(null);
@@ -168,6 +189,46 @@ export default function TicketsPage() {
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
+
+  useEffect(() => {
+    if (!selectedTicketId) {
+      setSuggestedResponses([]);
+      setSuggestionError(null);
+      return;
+    }
+
+    let shouldIgnore = false;
+
+    async function loadSuggestedResponses() {
+      setIsLoadingSuggestions(true);
+      setSuggestionError(null);
+
+      try {
+        const response = await fetch(`/api/tickets/${selectedTicketId}/suggested-responses`, {
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error('Unable to load suggested responses.');
+
+        const nextSuggestions = (await response.json()) as SuggestedResponse[];
+        if (!shouldIgnore) setSuggestedResponses(nextSuggestions);
+      } catch (loadError) {
+        if (!shouldIgnore) {
+          setSuggestedResponses([]);
+          setSuggestionError(
+            loadError instanceof Error ? loadError.message : 'Unexpected error while loading.'
+          );
+        }
+      } finally {
+        if (!shouldIgnore) setIsLoadingSuggestions(false);
+      }
+    }
+
+    void loadSuggestedResponses();
+
+    return () => {
+      shouldIgnore = true;
+    };
+  }, [selectedTicketId]);
 
   return (
     <main className="shell">
@@ -483,10 +544,37 @@ export default function TicketsPage() {
                     <h3>Suggested response</h3>
                     <MessageSquare size={16} aria-hidden="true" />
                   </div>
-                  <div className="placeholder-item">
-                    Suggested responses will appear here after the AI generation endpoint is
-                    implemented.
-                  </div>
+
+                  {suggestionError && (
+                    <div className="notice error inline-notice" role="status">
+                      <AlertCircle size={16} aria-hidden="true" />
+                      {suggestionError}
+                    </div>
+                  )}
+
+                  {isLoadingSuggestions && !suggestionError && (
+                    <div className="placeholder-item">Loading suggested responses...</div>
+                  )}
+
+                  {!isLoadingSuggestions && !suggestionError && latestSuggestedResponse && (
+                    <article className="suggested-response-card">
+                      <div className="suggested-response-meta">
+                        <span
+                          className={`suggested-response-status ${latestSuggestedResponse.status}`}
+                        >
+                          {suggestedResponseStatusLabels[latestSuggestedResponse.status]}
+                        </span>
+                        <span>{formatDate(latestSuggestedResponse.created_at)}</span>
+                      </div>
+                      <p>{latestSuggestedResponse.content}</p>
+                    </article>
+                  )}
+
+                  {!isLoadingSuggestions && !suggestionError && !latestSuggestedResponse && (
+                    <div className="placeholder-item">
+                      No suggested responses generated for this ticket yet.
+                    </div>
+                  )}
                 </section>
 
                 <section className="detail-section">
@@ -495,7 +583,9 @@ export default function TicketsPage() {
                     <BookOpen size={16} aria-hidden="true" />
                   </div>
                   <div className="placeholder-item">
-                    Retrieved document chunks and internal policies will be shown here.
+                    {latestSuggestedResponse
+                      ? `${latestSuggestedResponse.sources.length} sources linked to the latest suggestion.`
+                      : 'Sources will be shown after a suggested response retrieves document chunks.'}
                   </div>
                 </section>
 
