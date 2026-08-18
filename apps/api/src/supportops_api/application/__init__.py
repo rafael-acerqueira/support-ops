@@ -14,11 +14,25 @@ from supportops_api.application.documents import (
     ProcessDocument,
     StoredDocumentFile,
 )
+from supportops_api.application.tickets import (
+    ChangeTicketPriority,
+    ChangeTicketStatus,
+    CreateTicket,
+    CreateTicketInput,
+    GetTicket,
+    ListTickets,
+    TicketNotFoundError,
+    TicketRepository,
+)
 
 __all__ = [
     "ActivateDocument",
+    "ChangeTicketPriority",
+    "ChangeTicketStatus",
     "CreateDocument",
     "CreateDocumentInput",
+    "CreateTicket",
+    "CreateTicketInput",
     "DeactivateDocument",
     "DocumentNotFoundError",
     "DocumentProcessingQueue",
@@ -27,7 +41,11 @@ __all__ = [
     "DocumentStorage",
     "EnqueuedDocumentProcessing",
     "GetDocument",
+    "GetTicket",
     "ListDocuments",
+    "ListTickets",
     "ProcessDocument",
     "StoredDocumentFile",
+    "TicketNotFoundError",
+    "TicketRepository",
 ]
