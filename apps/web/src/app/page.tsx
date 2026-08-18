@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import {
   AlertCircle,
   CheckCircle,
@@ -278,14 +279,19 @@ export default function DocumentsPage() {
             </p>
           </div>
 
-          <button
-            className="icon-button"
-            type="button"
-            onClick={() => void loadDocuments()}
-            title="Refresh list"
-          >
-            <RefreshCw size={18} aria-hidden="true" />
-          </button>
+          <div className="header-actions">
+            <Link className="secondary-button compact" href="/tickets">
+              Tickets
+            </Link>
+            <button
+              className="icon-button"
+              type="button"
+              onClick={() => void loadDocuments()}
+              title="Refresh list"
+            >
+              <RefreshCw size={18} aria-hidden="true" />
+            </button>
+          </div>
         </header>
 
         <section className="metrics" aria-label="Documents summary">
