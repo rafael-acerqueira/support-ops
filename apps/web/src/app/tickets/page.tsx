@@ -115,6 +115,7 @@ export default function TicketsPage() {
   const [suggestedResponses, setSuggestedResponses] = useState<SuggestedResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
 
@@ -189,6 +190,34 @@ export default function TicketsPage() {
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
+
+  const generateSuggestedResponse = useCallback(async () => {
+    if (!selectedTicketId) return;
+
+    setIsGeneratingSuggestion(true);
+    setSuggestionError(null);
+
+    try {
+      const response = await fetch(`/api/tickets/${selectedTicketId}/suggested-responses`, {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error('Unable to generate suggested response.');
+
+      const nextSuggestion = (await response.json()) as SuggestedResponse;
+      setSuggestedResponses((currentSuggestions) => [
+        nextSuggestion,
+        ...currentSuggestions.filter((suggestion) => suggestion.id !== nextSuggestion.id),
+      ]);
+    } catch (generateError) {
+      setSuggestionError(
+        generateError instanceof Error
+          ? generateError.message
+          : 'Unexpected error while generating.'
+      );
+    } finally {
+      setIsGeneratingSuggestion(false);
+    }
+  }, [selectedTicketId]);
 
   useEffect(() => {
     if (!selectedTicketId) {
@@ -484,9 +513,14 @@ export default function TicketsPage() {
                 </div>
 
                 <div className="detail-actions">
-                  <button className="primary-button compact" type="button" disabled>
+                  <button
+                    className="primary-button compact"
+                    type="button"
+                    disabled={isGeneratingSuggestion || isLoadingSuggestions}
+                    onClick={() => void generateSuggestedResponse()}
+                  >
                     <MessageSquare size={16} aria-hidden="true" />
-                    Suggest response
+                    {isGeneratingSuggestion ? 'Generating...' : 'Suggest response'}
                   </button>
                 </div>
 
@@ -552,29 +586,39 @@ export default function TicketsPage() {
                     </div>
                   )}
 
-                  {isLoadingSuggestions && !suggestionError && (
-                    <div className="placeholder-item">Loading suggested responses...</div>
-                  )}
-
-                  {!isLoadingSuggestions && !suggestionError && latestSuggestedResponse && (
-                    <article className="suggested-response-card">
-                      <div className="suggested-response-meta">
-                        <span
-                          className={`suggested-response-status ${latestSuggestedResponse.status}`}
-                        >
-                          {suggestedResponseStatusLabels[latestSuggestedResponse.status]}
-                        </span>
-                        <span>{formatDate(latestSuggestedResponse.created_at)}</span>
-                      </div>
-                      <p>{latestSuggestedResponse.content}</p>
-                    </article>
-                  )}
-
-                  {!isLoadingSuggestions && !suggestionError && !latestSuggestedResponse && (
+                  {(isLoadingSuggestions || isGeneratingSuggestion) && !suggestionError && (
                     <div className="placeholder-item">
-                      No suggested responses generated for this ticket yet.
+                      {isGeneratingSuggestion
+                        ? 'Generating suggested response...'
+                        : 'Loading suggested responses...'}
                     </div>
                   )}
+
+                  {!isLoadingSuggestions &&
+                    !isGeneratingSuggestion &&
+                    !suggestionError &&
+                    latestSuggestedResponse && (
+                      <article className="suggested-response-card">
+                        <div className="suggested-response-meta">
+                          <span
+                            className={`suggested-response-status ${latestSuggestedResponse.status}`}
+                          >
+                            {suggestedResponseStatusLabels[latestSuggestedResponse.status]}
+                          </span>
+                          <span>{formatDate(latestSuggestedResponse.created_at)}</span>
+                        </div>
+                        <p>{latestSuggestedResponse.content}</p>
+                      </article>
+                    )}
+
+                  {!isLoadingSuggestions &&
+                    !isGeneratingSuggestion &&
+                    !suggestionError &&
+                    !latestSuggestedResponse && (
+                      <div className="placeholder-item">
+                        No suggested responses generated for this ticket yet.
+                      </div>
+                    )}
                 </section>
 
                 <section className="detail-section">
