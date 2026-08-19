@@ -871,6 +871,99 @@ tbody tr:last-child td {
   line-height: 1.6 !important;
 }
 
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+}
+
+.analysis-grid div {
+  min-width: 0;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  padding: 10px;
+}
+
+.analysis-grid dt {
+  margin: 0 0 4px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.analysis-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #f1f5f9;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.risk-badge {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 24px;
+  align-items: center;
+  border-radius: 16px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.risk-badge.low {
+  border: 1px solid #10b981;
+  background: rgba(16, 185, 129, 0.16);
+  color: #10b981;
+}
+
+.risk-badge.medium {
+  border: 1px solid #fbbf24;
+  background: rgba(251, 191, 36, 0.16);
+  color: #fbbf24;
+}
+
+.risk-badge.high {
+  border: 1px solid #dc2626;
+  background: rgba(220, 38, 38, 0.18);
+  color: #fca5a5;
+}
+
+.required-documents {
+  margin-top: 12px;
+}
+
+.required-documents > span {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.mini-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.mini-tag-list strong {
+  border: 1px solid #475569;
+  border-radius: 16px;
+  background: #0f172a;
+  color: #cbd5e1;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .placeholder-item {
   margin-top: 12px;
   border: 1px solid #475569;

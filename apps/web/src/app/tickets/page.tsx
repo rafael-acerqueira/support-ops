@@ -24,6 +24,7 @@ type TicketStatus =
   | 'closed';
 type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 type SuggestedResponseStatus = 'draft' | 'approved' | 'rejected';
+type RiskLevel = 'Low' | 'Medium' | 'High';
 type ProductArea = 'billing' | 'security' | 'support' | 'api' | 'product' | 'legal';
 type FilterValue = 'all' | string;
 
@@ -109,6 +110,28 @@ function humanize(value: string) {
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+function getTicketRisk(ticket: SupportTicket): RiskLevel {
+  if (ticket.priority === 'urgent') return 'High';
+  if (ticket.priority === 'high' || ticket.customer_tier === 'enterprise') return 'Medium';
+  return 'Low';
+}
+
+function shouldEscalateTicket(ticket: SupportTicket) {
+  return ticket.priority === 'urgent' || ticket.priority === 'high';
+}
+
+function getTicketIntent(ticket: SupportTicket) {
+  return `${ticket.product_area}_support_request`;
+}
+
+function getRequiredDocuments(ticket: SupportTicket) {
+  return [
+    `${ticket.product_area}-playbook.md`,
+    'internal-support-policy.md',
+    `${ticket.customer_tier}-sla.md`,
+  ];
 }
 
 export default function TicketsPage() {
@@ -610,6 +633,51 @@ export default function TicketsPage() {
                 <section className="detail-section">
                   <h3>Customer message</h3>
                   <p className="ticket-description">{selectedTicket.description}</p>
+                </section>
+
+                <section className="detail-section">
+                  <div className="section-title-row">
+                    <h3>AI analysis</h3>
+                    <AlertCircle size={16} aria-hidden="true" />
+                  </div>
+                  <dl className="analysis-grid">
+                    <div>
+                      <dt>Category</dt>
+                      <dd>{humanize(selectedTicket.product_area)}</dd>
+                    </div>
+                    <div>
+                      <dt>Intent</dt>
+                      <dd>{getTicketIntent(selectedTicket)}</dd>
+                    </div>
+                    <div>
+                      <dt>Urgency</dt>
+                      <dd>{priorityLabels[selectedTicket.priority]}</dd>
+                    </div>
+                    <div>
+                      <dt>Risk</dt>
+                      <dd>
+                        <span
+                          className={`risk-badge ${getTicketRisk(selectedTicket).toLowerCase()}`}
+                        >
+                          {getTicketRisk(selectedTicket)}
+                        </span>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Escalation</dt>
+                      <dd>
+                        {shouldEscalateTicket(selectedTicket) ? 'Recommended' : 'Not required'}
+                      </dd>
+                    </div>
+                  </dl>
+                  <div className="required-documents">
+                    <span>Required documents</span>
+                    <div className="mini-tag-list">
+                      {getRequiredDocuments(selectedTicket).map((documentName) => (
+                        <strong key={documentName}>{documentName}</strong>
+                      ))}
+                    </div>
+                  </div>
                 </section>
 
                 <section className="detail-section">
