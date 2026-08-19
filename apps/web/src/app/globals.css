@@ -942,6 +942,22 @@ tbody tr:last-child td {
   color: #fca5a5;
 }
 
+.review-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.approve-action:hover:not(:disabled) {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.reject-action:hover:not(:disabled) {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.12);
+}
+
 .section-title-row svg {
   flex: 0 0 auto;
   color: #0ea5e9;

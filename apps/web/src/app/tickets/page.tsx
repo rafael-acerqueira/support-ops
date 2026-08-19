@@ -116,6 +116,7 @@ export default function TicketsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
+  const [reviewingSuggestionId, setReviewingSuggestionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
 
@@ -218,6 +219,37 @@ export default function TicketsPage() {
       setIsGeneratingSuggestion(false);
     }
   }, [selectedTicketId]);
+
+  const reviewSuggestedResponse = useCallback(
+    async (suggestion: SuggestedResponse, decision: 'approve' | 'reject') => {
+      if (!selectedTicketId) return;
+
+      setReviewingSuggestionId(suggestion.id);
+      setSuggestionError(null);
+
+      try {
+        const response = await fetch(
+          `/api/tickets/${selectedTicketId}/suggested-responses/${suggestion.id}/${decision}`,
+          { method: 'PATCH' }
+        );
+        if (!response.ok) throw new Error('Unable to update suggested response review.');
+
+        const updatedSuggestion = (await response.json()) as SuggestedResponse;
+        setSuggestedResponses((currentSuggestions) =>
+          currentSuggestions.map((currentSuggestion) =>
+            currentSuggestion.id === updatedSuggestion.id ? updatedSuggestion : currentSuggestion
+          )
+        );
+      } catch (reviewError) {
+        setSuggestionError(
+          reviewError instanceof Error ? reviewError.message : 'Unexpected error while reviewing.'
+        );
+      } finally {
+        setReviewingSuggestionId(null);
+      }
+    },
+    [selectedTicketId]
+  );
 
   useEffect(() => {
     if (!selectedTicketId) {
@@ -635,9 +667,34 @@ export default function TicketsPage() {
 
                 <section className="detail-section">
                   <h3>Review</h3>
-                  <div className="placeholder-item">
-                    Approval and rejection controls will be enabled after a draft response exists.
-                  </div>
+                  {latestSuggestedResponse ? (
+                    <div className="review-actions">
+                      <button
+                        className="secondary-button compact approve-action"
+                        type="button"
+                        disabled={reviewingSuggestionId === latestSuggestedResponse.id}
+                        onClick={() =>
+                          void reviewSuggestedResponse(latestSuggestedResponse, 'approve')
+                        }
+                      >
+                        Approve
+                      </button>
+                      <button
+                        className="secondary-button compact reject-action"
+                        type="button"
+                        disabled={reviewingSuggestionId === latestSuggestedResponse.id}
+                        onClick={() =>
+                          void reviewSuggestedResponse(latestSuggestedResponse, 'reject')
+                        }
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="placeholder-item">
+                      Approval and rejection controls will be enabled after a draft response exists.
+                    </div>
+                  )}
                 </section>
               </>
             ) : (
