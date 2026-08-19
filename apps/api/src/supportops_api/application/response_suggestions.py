@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from supportops_api.application.tickets import TicketNotFoundError, TicketRepository
@@ -29,8 +29,14 @@ class ResponseSuggestionRepository(Protocol):
         pass
 
 
+@dataclass(frozen=True)
+class GeneratedSuggestedResponse:
+    content: str
+    sources: list[dict[str, Any]]
+
+
 class ResponseSuggestionGenerator(Protocol):
-    async def generate(self, ticket: Ticket) -> str:
+    async def generate(self, ticket: Ticket) -> GeneratedSuggestedResponse:
         pass
 
 
@@ -55,8 +61,12 @@ class GenerateSuggestedResponse:
         if ticket is None:
             raise TicketNotFoundError(data.ticket_id)
 
-        content = await self._generator.generate(ticket)
-        suggestion = SuggestedResponse.create(ticket_id=ticket.id, content=content)
+        generated_response = await self._generator.generate(ticket)
+        suggestion = SuggestedResponse.create(
+            ticket_id=ticket.id,
+            content=generated_response.content,
+            sources=generated_response.sources,
+        )
         await self._suggestion_repository.add(suggestion)
         return suggestion
 

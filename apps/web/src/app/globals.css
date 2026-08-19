@@ -958,6 +958,52 @@ tbody tr:last-child td {
   background: rgba(220, 38, 38, 0.12);
 }
 
+.source-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.source-item {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  padding: 12px;
+}
+
+.source-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.source-item-header strong {
+  overflow: hidden;
+  color: #f1f5f9;
+  font-size: 13px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-item-header span,
+.source-item small {
+  color: #94a3b8;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.source-item p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .section-title-row svg {
   flex: 0 0 auto;
   color: #0ea5e9;

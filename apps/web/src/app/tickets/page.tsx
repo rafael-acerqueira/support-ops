@@ -27,12 +27,19 @@ type SuggestedResponseStatus = 'draft' | 'approved' | 'rejected';
 type ProductArea = 'billing' | 'security' | 'support' | 'api' | 'product' | 'legal';
 type FilterValue = 'all' | string;
 
+type SuggestedResponseSource = {
+  document_name?: string;
+  document_type?: string;
+  relevance_score?: number;
+  excerpt?: string;
+};
+
 type SuggestedResponse = {
   id: string;
   ticket_id: string;
   content: string;
   status: SuggestedResponseStatus;
-  sources: Array<Record<string, unknown>>;
+  sources: SuggestedResponseSource[];
   created_at: string;
   updated_at: string;
 };
@@ -658,11 +665,26 @@ export default function TicketsPage() {
                     <h3>Sources</h3>
                     <BookOpen size={16} aria-hidden="true" />
                   </div>
-                  <div className="placeholder-item">
-                    {latestSuggestedResponse
-                      ? `${latestSuggestedResponse.sources.length} sources linked to the latest suggestion.`
-                      : 'Sources will be shown after a suggested response retrieves document chunks.'}
-                  </div>
+                  {latestSuggestedResponse?.sources.length ? (
+                    <div className="source-list">
+                      {latestSuggestedResponse.sources.map((source, index) => (
+                        <article className="source-item" key={`${source.document_name}-${index}`}>
+                          <div className="source-item-header">
+                            <strong>{source.document_name ?? 'Source document'}</strong>
+                            {typeof source.relevance_score === 'number' && (
+                              <span>{Math.round(source.relevance_score * 100)}%</span>
+                            )}
+                          </div>
+                          <p>{source.excerpt ?? 'No excerpt available for this source yet.'}</p>
+                          {source.document_type && <small>{source.document_type}</small>}
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="placeholder-item">
+                      Sources will be shown after a suggested response retrieves document chunks.
+                    </div>
+                  )}
                 </section>
 
                 <section className="detail-section">

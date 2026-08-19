@@ -11,7 +11,10 @@ from supportops_api.api.dependencies import (
     get_response_suggestion_repository,
     get_ticket_repository,
 )
-from supportops_api.application.response_suggestions import ResponseSuggestionRepository
+from supportops_api.application.response_suggestions import (
+    GeneratedSuggestedResponse,
+    ResponseSuggestionRepository,
+)
 from supportops_api.application.tickets import TicketRepository
 from supportops_api.domain.documents import ProductArea
 from supportops_api.domain.response_suggestions import SuggestedResponse, SuggestedResponseStatus
@@ -41,8 +44,11 @@ class InMemoryResponseSuggestionRepository(ResponseSuggestionRepository):
 
 
 class FakeResponseSuggestionGenerator:
-    async def generate(self, ticket: Ticket) -> str:
-        return f"Suggested reply for {ticket.external_id}"
+    async def generate(self, ticket: Ticket) -> GeneratedSuggestedResponse:
+        return GeneratedSuggestedResponse(
+            content=f"Suggested reply for {ticket.external_id}",
+            sources=[{"document_name": "billing-playbook.md", "relevance_score": 0.9}],
+        )
 
 
 class FakeSession:
@@ -257,6 +263,7 @@ async def test_generate_suggested_response(
     assert body["ticket_id"] == str(ticket.id)
     assert body["content"] == "Suggested reply for TCK-1001"
     assert body["status"] == "draft"
+    assert body["sources"] == [{"document_name": "billing-playbook.md", "relevance_score": 0.9}]
     assert UUID(body["id"]) in suggestion_repository.suggestions
     assert session.commit_count == 1
 

@@ -4,6 +4,7 @@ import pytest
 
 from supportops_api.application.response_suggestions import (
     ApproveSuggestedResponse,
+    GeneratedSuggestedResponse,
     GenerateSuggestedResponse,
     GenerateSuggestedResponseInput,
     ListSuggestedResponses,
@@ -60,8 +61,11 @@ class InMemorySuggestionRepository:
 
 
 class FakeGenerator:
-    async def generate(self, ticket: Ticket) -> str:
-        return f"Suggested reply for {ticket.external_id}"
+    async def generate(self, ticket: Ticket) -> GeneratedSuggestedResponse:
+        return GeneratedSuggestedResponse(
+            content=f"Suggested reply for {ticket.external_id}",
+            sources=[{"document_name": "billing-playbook.md", "relevance_score": 0.9}],
+        )
 
 
 def create_ticket() -> Ticket:
@@ -88,6 +92,7 @@ async def test_generate_suggested_response_persists_draft() -> None:
 
     assert suggestion.content == "Suggested reply for TCK-1001"
     assert suggestion.status == SuggestedResponseStatus.DRAFT
+    assert suggestion.sources == [{"document_name": "billing-playbook.md", "relevance_score": 0.9}]
     assert suggestion_repository.suggestions[suggestion.id] == suggestion
 
 
