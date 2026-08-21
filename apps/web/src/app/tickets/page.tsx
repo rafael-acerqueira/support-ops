@@ -23,8 +23,27 @@ type TicketStatus =
   | 'resolved'
   | 'closed';
 type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
+type SuggestedResponseStatus = 'draft' | 'approved' | 'rejected';
+type RiskLevel = 'Low' | 'Medium' | 'High';
 type ProductArea = 'billing' | 'security' | 'support' | 'api' | 'product' | 'legal';
 type FilterValue = 'all' | string;
+
+type SuggestedResponseSource = {
+  document_name?: string;
+  document_type?: string;
+  relevance_score?: number;
+  excerpt?: string;
+};
+
+type SuggestedResponse = {
+  id: string;
+  ticket_id: string;
+  content: string;
+  status: SuggestedResponseStatus;
+  sources: SuggestedResponseSource[];
+  created_at: string;
+  updated_at: string;
+};
 
 type SupportTicket = {
   id: string;
@@ -54,6 +73,12 @@ const priorityLabels: Record<TicketPriority, string> = {
   normal: 'Normal',
   high: 'High',
   urgent: 'Urgent',
+};
+
+const suggestedResponseStatusLabels: Record<SuggestedResponseStatus, string> = {
+  draft: 'Draft',
+  approved: 'Approved',
+  rejected: 'Rejected',
 };
 
 const statusIcons = {
@@ -87,6 +112,28 @@ function humanize(value: string) {
     .join(' ');
 }
 
+function getTicketRisk(ticket: SupportTicket): RiskLevel {
+  if (ticket.priority === 'urgent') return 'High';
+  if (ticket.priority === 'high' || ticket.customer_tier === 'enterprise') return 'Medium';
+  return 'Low';
+}
+
+function shouldEscalateTicket(ticket: SupportTicket) {
+  return ticket.priority === 'urgent' || ticket.priority === 'high';
+}
+
+function getTicketIntent(ticket: SupportTicket) {
+  return `${ticket.product_area}_support_request`;
+}
+
+function getRequiredDocuments(ticket: SupportTicket) {
+  return [
+    `${ticket.product_area}-playbook.md`,
+    'internal-support-policy.md',
+    `${ticket.customer_tier}-sla.md`,
+  ];
+}
+
 export default function TicketsPage() {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [statusFilter, setStatusFilter] = useState<FilterValue>('all');
@@ -95,8 +142,13 @@ export default function TicketsPage() {
   const [planFilter, setPlanFilter] = useState<FilterValue>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [suggestedResponses, setSuggestedResponses] = useState<SuggestedResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
+  const [reviewingSuggestionId, setReviewingSuggestionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
 
   const categoryOptions = useMemo(
     () => Array.from(new Set(tickets.map((ticket) => ticket.product_area))).sort(),
@@ -143,6 +195,7 @@ export default function TicketsPage() {
     [selectedTicketId, tickets]
   );
   const SelectedStatusIcon = selectedTicket ? statusIcons[selectedTicket.status] : null;
+  const latestSuggestedResponse = suggestedResponses[0] ?? null;
 
   const loadTickets = useCallback(async () => {
     setError(null);
@@ -168,6 +221,105 @@ export default function TicketsPage() {
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
+
+  const generateSuggestedResponse = useCallback(async () => {
+    if (!selectedTicketId) return;
+
+    setIsGeneratingSuggestion(true);
+    setSuggestionError(null);
+
+    try {
+      const response = await fetch(`/api/tickets/${selectedTicketId}/suggested-responses`, {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error('Unable to generate suggested response.');
+
+      const nextSuggestion = (await response.json()) as SuggestedResponse;
+      setSuggestedResponses((currentSuggestions) => [
+        nextSuggestion,
+        ...currentSuggestions.filter((suggestion) => suggestion.id !== nextSuggestion.id),
+      ]);
+    } catch (generateError) {
+      setSuggestionError(
+        generateError instanceof Error
+          ? generateError.message
+          : 'Unexpected error while generating.'
+      );
+    } finally {
+      setIsGeneratingSuggestion(false);
+    }
+  }, [selectedTicketId]);
+
+  const reviewSuggestedResponse = useCallback(
+    async (suggestion: SuggestedResponse, decision: 'approve' | 'reject') => {
+      if (!selectedTicketId) return;
+
+      setReviewingSuggestionId(suggestion.id);
+      setSuggestionError(null);
+
+      try {
+        const response = await fetch(
+          `/api/tickets/${selectedTicketId}/suggested-responses/${suggestion.id}/${decision}`,
+          { method: 'PATCH' }
+        );
+        if (!response.ok) throw new Error('Unable to update suggested response review.');
+
+        const updatedSuggestion = (await response.json()) as SuggestedResponse;
+        setSuggestedResponses((currentSuggestions) =>
+          currentSuggestions.map((currentSuggestion) =>
+            currentSuggestion.id === updatedSuggestion.id ? updatedSuggestion : currentSuggestion
+          )
+        );
+      } catch (reviewError) {
+        setSuggestionError(
+          reviewError instanceof Error ? reviewError.message : 'Unexpected error while reviewing.'
+        );
+      } finally {
+        setReviewingSuggestionId(null);
+      }
+    },
+    [selectedTicketId]
+  );
+
+  useEffect(() => {
+    if (!selectedTicketId) {
+      setSuggestedResponses([]);
+      setSuggestionError(null);
+      return;
+    }
+
+    let shouldIgnore = false;
+
+    async function loadSuggestedResponses() {
+      setIsLoadingSuggestions(true);
+      setSuggestionError(null);
+
+      try {
+        const response = await fetch(`/api/tickets/${selectedTicketId}/suggested-responses`, {
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error('Unable to load suggested responses.');
+
+        const nextSuggestions = (await response.json()) as SuggestedResponse[];
+        if (!shouldIgnore) setSuggestedResponses(nextSuggestions);
+      } catch (loadError) {
+        if (!shouldIgnore) {
+          setSuggestedResponses([]);
+          setSuggestionError(
+            loadError instanceof Error ? loadError.message : 'Unexpected error while loading.'
+          );
+        }
+      } finally {
+        if (!shouldIgnore) setIsLoadingSuggestions(false);
+      }
+    }
+
+    void loadSuggestedResponses();
+
+    return () => {
+      shouldIgnore = true;
+    };
+  }, [selectedTicketId]);
 
   return (
     <main className="shell">
@@ -423,9 +575,14 @@ export default function TicketsPage() {
                 </div>
 
                 <div className="detail-actions">
-                  <button className="primary-button compact" type="button" disabled>
+                  <button
+                    className="primary-button compact"
+                    type="button"
+                    disabled={isGeneratingSuggestion || isLoadingSuggestions}
+                    onClick={() => void generateSuggestedResponse()}
+                  >
                     <MessageSquare size={16} aria-hidden="true" />
-                    Suggest response
+                    {isGeneratingSuggestion ? 'Generating...' : 'Suggest response'}
                   </button>
                 </div>
 
@@ -480,13 +637,95 @@ export default function TicketsPage() {
 
                 <section className="detail-section">
                   <div className="section-title-row">
+                    <h3>AI analysis</h3>
+                    <AlertCircle size={16} aria-hidden="true" />
+                  </div>
+                  <dl className="analysis-grid">
+                    <div>
+                      <dt>Category</dt>
+                      <dd>{humanize(selectedTicket.product_area)}</dd>
+                    </div>
+                    <div>
+                      <dt>Intent</dt>
+                      <dd>{getTicketIntent(selectedTicket)}</dd>
+                    </div>
+                    <div>
+                      <dt>Urgency</dt>
+                      <dd>{priorityLabels[selectedTicket.priority]}</dd>
+                    </div>
+                    <div>
+                      <dt>Risk</dt>
+                      <dd>
+                        <span
+                          className={`risk-badge ${getTicketRisk(selectedTicket).toLowerCase()}`}
+                        >
+                          {getTicketRisk(selectedTicket)}
+                        </span>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Escalation</dt>
+                      <dd>
+                        {shouldEscalateTicket(selectedTicket) ? 'Recommended' : 'Not required'}
+                      </dd>
+                    </div>
+                  </dl>
+                  <div className="required-documents">
+                    <span>Required documents</span>
+                    <div className="mini-tag-list">
+                      {getRequiredDocuments(selectedTicket).map((documentName) => (
+                        <strong key={documentName}>{documentName}</strong>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+
+                <section className="detail-section">
+                  <div className="section-title-row">
                     <h3>Suggested response</h3>
                     <MessageSquare size={16} aria-hidden="true" />
                   </div>
-                  <div className="placeholder-item">
-                    Suggested responses will appear here after the AI generation endpoint is
-                    implemented.
-                  </div>
+
+                  {suggestionError && (
+                    <div className="notice error inline-notice" role="status">
+                      <AlertCircle size={16} aria-hidden="true" />
+                      {suggestionError}
+                    </div>
+                  )}
+
+                  {(isLoadingSuggestions || isGeneratingSuggestion) && !suggestionError && (
+                    <div className="placeholder-item">
+                      {isGeneratingSuggestion
+                        ? 'Generating suggested response...'
+                        : 'Loading suggested responses...'}
+                    </div>
+                  )}
+
+                  {!isLoadingSuggestions &&
+                    !isGeneratingSuggestion &&
+                    !suggestionError &&
+                    latestSuggestedResponse && (
+                      <article className="suggested-response-card">
+                        <div className="suggested-response-meta">
+                          <span
+                            className={`suggested-response-status ${latestSuggestedResponse.status}`}
+                          >
+                            {suggestedResponseStatusLabels[latestSuggestedResponse.status]}
+                          </span>
+                          <span>{formatDate(latestSuggestedResponse.created_at)}</span>
+                        </div>
+                        <p>{latestSuggestedResponse.content}</p>
+                      </article>
+                    )}
+
+                  {!isLoadingSuggestions &&
+                    !isGeneratingSuggestion &&
+                    !suggestionError &&
+                    !latestSuggestedResponse && (
+                      <div className="placeholder-item">
+                        No suggested responses generated for this ticket yet.
+                      </div>
+                    )}
                 </section>
 
                 <section className="detail-section">
@@ -494,16 +733,58 @@ export default function TicketsPage() {
                     <h3>Sources</h3>
                     <BookOpen size={16} aria-hidden="true" />
                   </div>
-                  <div className="placeholder-item">
-                    Retrieved document chunks and internal policies will be shown here.
-                  </div>
+                  {latestSuggestedResponse?.sources.length ? (
+                    <div className="source-list">
+                      {latestSuggestedResponse.sources.map((source, index) => (
+                        <article className="source-item" key={`${source.document_name}-${index}`}>
+                          <div className="source-item-header">
+                            <strong>{source.document_name ?? 'Source document'}</strong>
+                            {typeof source.relevance_score === 'number' && (
+                              <span>{Math.round(source.relevance_score * 100)}%</span>
+                            )}
+                          </div>
+                          <p>{source.excerpt ?? 'No excerpt available for this source yet.'}</p>
+                          {source.document_type && <small>{source.document_type}</small>}
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="placeholder-item">
+                      Sources will be shown after a suggested response retrieves document chunks.
+                    </div>
+                  )}
                 </section>
 
                 <section className="detail-section">
                   <h3>Review</h3>
-                  <div className="placeholder-item">
-                    Approval and rejection controls will be enabled after a draft response exists.
-                  </div>
+                  {latestSuggestedResponse ? (
+                    <div className="review-actions">
+                      <button
+                        className="secondary-button compact approve-action"
+                        type="button"
+                        disabled={reviewingSuggestionId === latestSuggestedResponse.id}
+                        onClick={() =>
+                          void reviewSuggestedResponse(latestSuggestedResponse, 'approve')
+                        }
+                      >
+                        Approve
+                      </button>
+                      <button
+                        className="secondary-button compact reject-action"
+                        type="button"
+                        disabled={reviewingSuggestionId === latestSuggestedResponse.id}
+                        onClick={() =>
+                          void reviewSuggestedResponse(latestSuggestedResponse, 'reject')
+                        }
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="placeholder-item">
+                      Approval and rejection controls will be enabled after a draft response exists.
+                    </div>
+                  )}
                 </section>
               </>
             ) : (

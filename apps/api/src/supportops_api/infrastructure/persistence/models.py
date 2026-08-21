@@ -34,6 +34,30 @@ class TicketRecord(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
+    suggested_responses: Mapped[list[SuggestedResponseRecord]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan"
+    )
+
+
+class SuggestedResponseRecord(Base):
+    __tablename__ = "suggested_responses"
+
+    id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True)
+    ticket_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True), ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    sources: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    ticket: Mapped[TicketRecord] = relationship(back_populates="suggested_responses")
+
 
 class DocumentRecord(Base):
     __tablename__ = "documents"
