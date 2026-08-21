@@ -397,6 +397,22 @@ tbody tr:last-child td {
   border-bottom: 0;
 }
 
+.document-row.inactive {
+  background: #172033;
+  opacity: 0.62;
+}
+
+.document-row.inactive:hover,
+.document-row.inactive.selected {
+  background: #243044;
+  opacity: 0.86;
+}
+
+.document-row.inactive .status-badge,
+.document-row.inactive .priority-badge {
+  filter: grayscale(0.35);
+}
+
 .document-name {
   min-width: 220px;
   gap: 10px;
@@ -426,6 +442,19 @@ tbody tr:last-child td {
   color: #94a3b8;
   font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   font-size: 12px;
+}
+
+.document-name em {
+  flex: 0 0 auto;
+  border: 1px solid #64748b;
+  border-radius: 16px;
+  background: #0f172a;
+  color: #94a3b8;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .status-badge {

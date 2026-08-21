@@ -263,7 +263,13 @@ export default function DocumentsPage() {
         );
       }
 
-      setMessage(action === 'process' ? 'Processing queued.' : 'Document updated.');
+      setMessage(
+        action === 'process'
+          ? 'Processing queued.'
+          : action === 'deactivate'
+            ? 'Document deactivated.'
+            : 'Document activated.'
+      );
       await loadDocuments({ silent: action === 'process' });
     } catch (actionError) {
       setError(
@@ -432,11 +438,13 @@ export default function DocumentsPage() {
 
                     return (
                       <tr
-                        className={
-                          selectedDocumentId === document.id
-                            ? 'document-row selected'
-                            : 'document-row'
-                        }
+                        className={[
+                          'document-row',
+                          selectedDocumentId === document.id ? 'selected' : '',
+                          document.is_active ? '' : 'inactive',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
                         key={document.id}
                         onClick={() => setSelectedDocumentId(document.id)}
                         onKeyDown={(event) => {
@@ -454,6 +462,7 @@ export default function DocumentsPage() {
                               <strong>{document.name}</strong>
                               <span>{formatBytes(document.size_bytes)}</span>
                             </div>
+                            {!document.is_active && <em>Inactive</em>}
                           </div>
                         </td>
                         <td>{humanize(document.document_type)}</td>
