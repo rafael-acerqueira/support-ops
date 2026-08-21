@@ -131,7 +131,7 @@ h1 {
 
 .document-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: 1fr;
   gap: 24px;
   margin-top: 24px;
   align-items: start;
@@ -147,8 +147,18 @@ h1 {
 
 .upload-panel {
   display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr)) minmax(160px, auto);
+  align-items: end;
   gap: 16px;
   padding: 20px;
+}
+
+.upload-panel .panel-title-row {
+  grid-column: 1 / -1;
+}
+
+.upload-panel .primary-button {
+  min-height: 44px;
 }
 
 .panel-title-row,
@@ -593,6 +603,10 @@ tbody tr:last-child td {
   display: grid;
   gap: 12px;
   margin: 20px 0 0;
+}
+
+.document-layout .detail-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .detail-grid div {
@@ -1132,12 +1146,12 @@ tbody tr:last-child td {
 }
 
 @media (max-width: 1180px) {
-  .document-layout {
-    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  .upload-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .detail-panel {
-    grid-column: 2;
+  .document-layout .detail-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1172,6 +1186,10 @@ tbody tr:last-child td {
   .ticket-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .document-layout .detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 520px) {
@@ -1192,6 +1210,8 @@ tbody tr:last-child td {
   }
 
   .metrics,
+  .upload-panel,
+  .document-layout .detail-grid,
   .ticket-controls {
     grid-template-columns: 1fr;
   }
