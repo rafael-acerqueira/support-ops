@@ -525,6 +525,7 @@ tbody tr:last-child td {
 
 .detail-panel {
   min-width: 0;
+  scroll-margin-top: 24px;
   border: 1px solid #475569;
   border-radius: 8px;
   background: #1e293b;

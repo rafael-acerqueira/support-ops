@@ -15,7 +15,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type DocumentStatus = 'uploaded' | 'processing' | 'indexed' | 'failed';
 type DocumentType =
@@ -107,6 +107,7 @@ function humanize(value: string) {
 }
 
 export default function DocumentsPage() {
+  const detailPanelRef = useRef<HTMLElement | null>(null);
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [documentType, setDocumentType] = useState<DocumentType>('internal_policy');
   const [productArea, setProductArea] = useState<ProductArea>('support');
@@ -142,6 +143,17 @@ export default function DocumentsPage() {
     setWatchedDocumentIds((current) =>
       current.includes(documentId) ? current : [...current, documentId]
     );
+  }, []);
+
+  const selectDocument = useCallback((documentId: string) => {
+    setSelectedDocumentId(documentId);
+
+    window.requestAnimationFrame(() => {
+      detailPanelRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
   }, []);
 
   const loadDocuments = useCallback(async (options?: { silent?: boolean }) => {
@@ -446,11 +458,11 @@ export default function DocumentsPage() {
                           .filter(Boolean)
                           .join(' ')}
                         key={document.id}
-                        onClick={() => setSelectedDocumentId(document.id)}
+                        onClick={() => selectDocument(document.id)}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault();
-                            setSelectedDocumentId(document.id);
+                            selectDocument(document.id);
                           }
                         }}
                         tabIndex={0}
@@ -487,7 +499,7 @@ export default function DocumentsPage() {
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setSelectedDocumentId(document.id);
+                                selectDocument(document.id);
                               }}
                               title="View details"
                             >
@@ -549,7 +561,7 @@ export default function DocumentsPage() {
             </div>
           </section>
 
-          <aside className="detail-panel" aria-labelledby="detail-title">
+          <aside className="detail-panel" ref={detailPanelRef} aria-labelledby="detail-title">
             {selectedDocument && SelectedStatusIcon ? (
               <>
                 <div className="detail-header">
