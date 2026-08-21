@@ -217,9 +217,22 @@ export default function DocumentsPage() {
 
       if (!response.ok) throw new Error('The API rejected the upload.');
 
+      const uploadedDocument = (await response.json()) as KnowledgeDocument;
+      const visibleDocument =
+        uploadedDocument.status === 'uploaded'
+          ? { ...uploadedDocument, status: 'processing' as DocumentStatus }
+          : uploadedDocument;
+
+      setDocuments((currentDocuments) => [
+        visibleDocument,
+        ...currentDocuments.filter((document) => document.id !== uploadedDocument.id),
+      ]);
+      setSelectedDocumentId(uploadedDocument.id);
+      if (!['indexed', 'failed'].includes(uploadedDocument.status))
+        watchDocument(uploadedDocument.id);
+
       setFile(null);
-      setMessage('Document uploaded.');
-      await loadDocuments();
+      setMessage('Document uploaded. Processing queued.');
     } catch (uploadError) {
       setError(
         uploadError instanceof Error ? uploadError.message : 'Unexpected error during upload.'

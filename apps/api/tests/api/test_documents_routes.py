@@ -275,7 +275,12 @@ async def test_upload_document(
     assert body["size_bytes"] == len(b"SLA policy content")
     assert body["tags"] == ["enterprise", "sla"]
     assert body["storage_key"] == "fake/enterprise-sla.md"
-    assert UUID(body["id"]) in repository.documents
+    assert body["status"] == "indexed"
+    assert body["chunk_count"] == 2
+    document_id = UUID(body["id"])
+    assert document_id in repository.documents
+    assert repository.documents[document_id].status == DocumentStatus.INDEXED
+    assert len(repository.chunks[document_id]) == 2
     assert storage.saved_files == [("enterprise-sla.md", "text/markdown", b"SLA policy content")]
     assert session.commit_count == 1
 
