@@ -71,6 +71,7 @@ async def upload_document(
     file: UploadFile = File(...),
     repository: DocumentRepository = Depends(get_document_repository),
     storage: DocumentStorage = Depends(get_document_storage),
+    processing_queue: DocumentProcessingQueue = Depends(get_document_processing_queue),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentResponse:
     content_type = file.content_type or "application/octet-stream"
@@ -99,6 +100,15 @@ async def upload_document(
             storage_key=stored_file.storage_key,
         )
     )
+
+    try:
+        await processing_queue.enqueue(document.id)
+    except ValueError as error:
+        await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": str(error)},
+        ) from error
 
     await session.commit()
     return DocumentResponse.from_domain(document)

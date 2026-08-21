@@ -15,7 +15,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type DocumentStatus = 'uploaded' | 'processing' | 'indexed' | 'failed';
 type DocumentType =
@@ -107,6 +107,7 @@ function humanize(value: string) {
 }
 
 export default function DocumentsPage() {
+  const detailPanelRef = useRef<HTMLElement | null>(null);
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [documentType, setDocumentType] = useState<DocumentType>('internal_policy');
   const [productArea, setProductArea] = useState<ProductArea>('support');
@@ -142,6 +143,17 @@ export default function DocumentsPage() {
     setWatchedDocumentIds((current) =>
       current.includes(documentId) ? current : [...current, documentId]
     );
+  }, []);
+
+  const selectDocument = useCallback((documentId: string) => {
+    setSelectedDocumentId(documentId);
+
+    window.requestAnimationFrame(() => {
+      detailPanelRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
   }, []);
 
   const loadDocuments = useCallback(async (options?: { silent?: boolean }) => {
@@ -217,9 +229,22 @@ export default function DocumentsPage() {
 
       if (!response.ok) throw new Error('The API rejected the upload.');
 
+      const uploadedDocument = (await response.json()) as KnowledgeDocument;
+      const visibleDocument =
+        uploadedDocument.status === 'uploaded'
+          ? { ...uploadedDocument, status: 'processing' as DocumentStatus }
+          : uploadedDocument;
+
+      setDocuments((currentDocuments) => [
+        visibleDocument,
+        ...currentDocuments.filter((document) => document.id !== uploadedDocument.id),
+      ]);
+      setSelectedDocumentId(uploadedDocument.id);
+      if (!['indexed', 'failed'].includes(uploadedDocument.status))
+        watchDocument(uploadedDocument.id);
+
       setFile(null);
-      setMessage('Document uploaded.');
-      await loadDocuments();
+      setMessage('Document uploaded. Processing queued.');
     } catch (uploadError) {
       setError(
         uploadError instanceof Error ? uploadError.message : 'Unexpected error during upload.'
@@ -250,7 +275,13 @@ export default function DocumentsPage() {
         );
       }
 
-      setMessage(action === 'process' ? 'Processing queued.' : 'Document updated.');
+      setMessage(
+        action === 'process'
+          ? 'Processing queued.'
+          : action === 'deactivate'
+            ? 'Document deactivated.'
+            : 'Document activated.'
+      );
       await loadDocuments({ silent: action === 'process' });
     } catch (actionError) {
       setError(
@@ -419,17 +450,19 @@ export default function DocumentsPage() {
 
                     return (
                       <tr
-                        className={
-                          selectedDocumentId === document.id
-                            ? 'document-row selected'
-                            : 'document-row'
-                        }
+                        className={[
+                          'document-row',
+                          selectedDocumentId === document.id ? 'selected' : '',
+                          document.is_active ? '' : 'inactive',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
                         key={document.id}
-                        onClick={() => setSelectedDocumentId(document.id)}
+                        onClick={() => selectDocument(document.id)}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault();
-                            setSelectedDocumentId(document.id);
+                            selectDocument(document.id);
                           }
                         }}
                         tabIndex={0}
@@ -441,6 +474,7 @@ export default function DocumentsPage() {
                               <strong>{document.name}</strong>
                               <span>{formatBytes(document.size_bytes)}</span>
                             </div>
+                            {!document.is_active && <em>Inactive</em>}
                           </div>
                         </td>
                         <td>{humanize(document.document_type)}</td>
@@ -465,7 +499,7 @@ export default function DocumentsPage() {
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setSelectedDocumentId(document.id);
+                                selectDocument(document.id);
                               }}
                               title="View details"
                             >
@@ -527,7 +561,7 @@ export default function DocumentsPage() {
             </div>
           </section>
 
-          <aside className="detail-panel" aria-labelledby="detail-title">
+          <aside className="detail-panel" ref={detailPanelRef} aria-labelledby="detail-title">
             {selectedDocument && SelectedStatusIcon ? (
               <>
                 <div className="detail-header">
