@@ -138,6 +138,7 @@ h1 {
 }
 
 .upload-panel,
+.ticket-create-panel,
 .documents-panel {
   border: 1px solid #475569;
   border-radius: 8px;
@@ -158,6 +159,27 @@ h1 {
 }
 
 .upload-panel .primary-button {
+  min-height: 44px;
+}
+
+.ticket-create-panel {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  align-items: end;
+  gap: 16px;
+  padding: 20px;
+}
+
+.ticket-create-panel .panel-title-row,
+.ticket-description-field {
+  grid-column: 1 / -1;
+}
+
+.ticket-subject-field {
+  grid-column: span 4;
+}
+
+.ticket-create-panel .primary-button {
   min-height: 44px;
 }
 
@@ -222,7 +244,8 @@ h1 {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   min-height: 44px;
   width: 100%;
   border: 1px solid #475569;
@@ -237,11 +260,18 @@ h1 {
 }
 
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
   border-color: #7c3aed;
 }
 
-.field input::placeholder {
+.field textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
   color: #64748b;
 }
 
@@ -1150,8 +1180,13 @@ tbody tr:last-child td {
 }
 
 @media (max-width: 1180px) {
-  .upload-panel {
+  .upload-panel,
+  .ticket-create-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ticket-subject-field {
+    grid-column: 1 / -1;
   }
 
   .document-layout .detail-grid {
@@ -1219,6 +1254,7 @@ tbody tr:last-child td {
 
   .metrics,
   .upload-panel,
+  .ticket-create-panel,
   .document-layout .detail-grid,
   .tickets-layout .detail-grid,
   .ticket-controls {
@@ -1226,6 +1262,7 @@ tbody tr:last-child td {
   }
 
   .upload-panel,
+  .ticket-create-panel,
   .panel-heading,
   .detail-panel,
   .ticket-controls {
