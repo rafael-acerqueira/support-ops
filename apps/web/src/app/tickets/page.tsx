@@ -6,6 +6,7 @@ import {
   CheckCircle,
   Clock,
   Eye,
+  Loader2,
   MessageSquare,
   RefreshCw,
   Search,
@@ -13,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type TicketStatus =
   | 'open'
@@ -92,6 +93,15 @@ const statusIcons = {
 
 const statusOptions = Object.entries(statusLabels) as Array<[TicketStatus, string]>;
 const priorityOptions = Object.entries(priorityLabels) as Array<[TicketPriority, string]>;
+const productAreaOptions: Array<{ value: ProductArea; label: string }> = [
+  { value: 'billing', label: 'Billing' },
+  { value: 'security', label: 'Security' },
+  { value: 'support', label: 'Support' },
+  { value: 'api', label: 'API' },
+  { value: 'product', label: 'Product' },
+  { value: 'legal', label: 'Legal' },
+];
+const customerTierOptions = ['starter', 'pro', 'enterprise'];
 
 function formatDate(value: string | null) {
   if (!value) return '-';
@@ -142,12 +152,21 @@ export default function TicketsPage() {
   const [categoryFilter, setCategoryFilter] = useState<FilterValue>('all');
   const [planFilter, setPlanFilter] = useState<FilterValue>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [newTicketExternalId, setNewTicketExternalId] = useState('');
+  const [newTicketCustomerName, setNewTicketCustomerName] = useState('');
+  const [newTicketCustomerTier, setNewTicketCustomerTier] = useState('enterprise');
+  const [newTicketSubject, setNewTicketSubject] = useState('');
+  const [newTicketDescription, setNewTicketDescription] = useState('');
+  const [newTicketProductArea, setNewTicketProductArea] = useState<ProductArea>('support');
+  const [newTicketPriority, setNewTicketPriority] = useState<TicketPriority>('normal');
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [suggestedResponses, setSuggestedResponses] = useState<SuggestedResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreatingTicket, setIsCreatingTicket] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
   const [reviewingSuggestionId, setReviewingSuggestionId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
 
@@ -233,6 +252,53 @@ export default function TicketsPage() {
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
+
+  async function handleCreateTicket(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setIsCreatingTicket(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          external_id: newTicketExternalId,
+          customer_name: newTicketCustomerName,
+          customer_tier: newTicketCustomerTier,
+          subject: newTicketSubject,
+          description: newTicketDescription,
+          product_area: newTicketProductArea,
+          priority: newTicketPriority,
+        }),
+      });
+
+      if (!response.ok) throw new Error('The API could not create the ticket.');
+
+      const createdTicket = (await response.json()) as SupportTicket;
+      setTickets((currentTickets) => [
+        createdTicket,
+        ...currentTickets.filter((ticket) => ticket.id !== createdTicket.id),
+      ]);
+      selectTicket(createdTicket.id);
+      setNewTicketExternalId('');
+      setNewTicketCustomerName('');
+      setNewTicketCustomerTier('enterprise');
+      setNewTicketSubject('');
+      setNewTicketDescription('');
+      setNewTicketProductArea('support');
+      setNewTicketPriority('normal');
+      setMessage('Ticket created.');
+    } catch (createError) {
+      setError(
+        createError instanceof Error ? createError.message : 'Unexpected error while creating.'
+      );
+    } finally {
+      setIsCreatingTicket(false);
+    }
+  }
 
   const generateSuggestedResponse = useCallback(async () => {
     if (!selectedTicketId) return;
@@ -380,6 +446,109 @@ export default function TicketsPage() {
         </section>
 
         <section className="tickets-layout">
+          <form className="ticket-create-panel" onSubmit={handleCreateTicket}>
+            <div className="panel-title-row">
+              <span className="icon-frame" aria-hidden="true">
+                <Ticket size={20} />
+              </span>
+              <div>
+                <h2>Create ticket</h2>
+                <p>Register a support request for local triage and response drafting.</p>
+              </div>
+            </div>
+
+            <label className="field">
+              <span>Ticket ID</span>
+              <input
+                value={newTicketExternalId}
+                onChange={(event) => setNewTicketExternalId(event.target.value)}
+                placeholder="TCK-1004"
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Customer</span>
+              <input
+                value={newTicketCustomerName}
+                onChange={(event) => setNewTicketCustomerName(event.target.value)}
+                placeholder="Globex Corp"
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Plan</span>
+              <select
+                value={newTicketCustomerTier}
+                onChange={(event) => setNewTicketCustomerTier(event.target.value)}
+              >
+                {customerTierOptions.map((tier) => (
+                  <option key={tier} value={tier}>
+                    {humanize(tier)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>Category</span>
+              <select
+                value={newTicketProductArea}
+                onChange={(event) => setNewTicketProductArea(event.target.value as ProductArea)}
+              >
+                {productAreaOptions.map((area) => (
+                  <option key={area.value} value={area.value}>
+                    {area.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>Priority</span>
+              <select
+                value={newTicketPriority}
+                onChange={(event) => setNewTicketPriority(event.target.value as TicketPriority)}
+              >
+                {priorityOptions.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field ticket-subject-field">
+              <span>Subject</span>
+              <input
+                value={newTicketSubject}
+                onChange={(event) => setNewTicketSubject(event.target.value)}
+                placeholder="Duplicate invoice charge"
+                required
+              />
+            </label>
+
+            <label className="field ticket-description-field">
+              <span>Description</span>
+              <textarea
+                value={newTicketDescription}
+                onChange={(event) => setNewTicketDescription(event.target.value)}
+                placeholder="Customer reports being charged twice for the same invoice and asks for refund guidance."
+                required
+              />
+            </label>
+
+            <button className="primary-button" type="submit" disabled={isCreatingTicket}>
+              {isCreatingTicket ? (
+                <Loader2 className="spin" size={18} aria-hidden="true" />
+              ) : (
+                <Ticket size={18} aria-hidden="true" />
+              )}
+              Create ticket
+            </button>
+          </form>
+
           <section className="documents-panel" aria-labelledby="tickets-title">
             <div className="panel-heading">
               <div>
@@ -393,10 +562,14 @@ export default function TicketsPage() {
               <span className="environment">development</span>
             </div>
 
-            {error && (
-              <div className="notice error" role="status">
-                <AlertCircle size={16} aria-hidden="true" />
-                {error}
+            {(message || error) && (
+              <div className={`notice ${error ? 'error' : 'success'}`} role="status">
+                {error ? (
+                  <AlertCircle size={16} aria-hidden="true" />
+                ) : (
+                  <CheckCircle size={16} aria-hidden="true" />
+                )}
+                {error ?? message}
               </div>
             )}
 
