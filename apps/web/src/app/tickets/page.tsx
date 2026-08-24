@@ -13,7 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type TicketStatus =
   | 'open'
@@ -135,6 +135,7 @@ function getRequiredDocuments(ticket: SupportTicket) {
 }
 
 export default function TicketsPage() {
+  const detailPanelRef = useRef<HTMLElement | null>(null);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [statusFilter, setStatusFilter] = useState<FilterValue>('all');
   const [priorityFilter, setPriorityFilter] = useState<FilterValue>('all');
@@ -196,6 +197,17 @@ export default function TicketsPage() {
   );
   const SelectedStatusIcon = selectedTicket ? statusIcons[selectedTicket.status] : null;
   const latestSuggestedResponse = suggestedResponses[0] ?? null;
+
+  const selectTicket = useCallback((ticketId: string) => {
+    setSelectedTicketId(ticketId);
+
+    window.requestAnimationFrame(() => {
+      detailPanelRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  }, []);
 
   const loadTickets = useCallback(async () => {
     setError(null);
@@ -481,11 +493,11 @@ export default function TicketsPage() {
                           selectedTicketId === ticket.id ? 'document-row selected' : 'document-row'
                         }
                         tabIndex={0}
-                        onClick={() => setSelectedTicketId(ticket.id)}
+                        onClick={() => selectTicket(ticket.id)}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault();
-                            setSelectedTicketId(ticket.id);
+                            selectTicket(ticket.id);
                           }
                         }}
                       >
@@ -521,7 +533,7 @@ export default function TicketsPage() {
                               title="View details"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setSelectedTicketId(ticket.id);
+                                selectTicket(ticket.id);
                               }}
                             >
                               <Eye size={16} aria-hidden="true" />
@@ -551,7 +563,11 @@ export default function TicketsPage() {
             </div>
           </section>
 
-          <aside className="detail-panel ticket-detail-panel" aria-labelledby="ticket-detail-title">
+          <aside
+            className="detail-panel ticket-detail-panel"
+            ref={detailPanelRef}
+            aria-labelledby="ticket-detail-title"
+          >
             {selectedTicket && SelectedStatusIcon ? (
               <>
                 <div className="detail-header">
