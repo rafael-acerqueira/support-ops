@@ -757,7 +757,7 @@ tbody tr:last-child td {
 
 .tickets-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: 1fr;
   gap: 24px;
   margin-top: 24px;
   align-items: start;
@@ -904,8 +904,11 @@ tbody tr:last-child td {
 }
 
 .ticket-detail-panel {
-  position: sticky;
-  top: 24px;
+  scroll-margin-top: 24px;
+}
+
+.tickets-layout .detail-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .ticket-description {
@@ -1154,6 +1157,10 @@ tbody tr:last-child td {
   .document-layout .detail-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .tickets-layout .detail-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1080px) {
@@ -1164,10 +1171,6 @@ tbody tr:last-child td {
 
   .detail-panel {
     grid-column: auto;
-  }
-
-  .ticket-detail-panel {
-    position: static;
   }
 }
 
@@ -1189,6 +1192,10 @@ tbody tr:last-child td {
   }
 
   .document-layout .detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tickets-layout .detail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1213,6 +1220,7 @@ tbody tr:last-child td {
   .metrics,
   .upload-panel,
   .document-layout .detail-grid,
+  .tickets-layout .detail-grid,
   .ticket-controls {
     grid-template-columns: 1fr;
   }
