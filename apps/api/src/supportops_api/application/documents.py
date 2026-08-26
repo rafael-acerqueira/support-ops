@@ -41,6 +41,21 @@ class DocumentProcessor(Protocol):
 
 
 @dataclass(frozen=True)
+class GeneratedEmbedding:
+    values: tuple[float, ...]
+    model: str
+
+    @property
+    def dimensions(self) -> int:
+        return len(self.values)
+
+
+class EmbeddingGenerator(Protocol):
+    async def generate(self, text: str) -> GeneratedEmbedding:
+        pass
+
+
+@dataclass(frozen=True)
 class EnqueuedDocumentProcessing:
     document_id: UUID
     task_id: str
