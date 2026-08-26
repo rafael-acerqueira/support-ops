@@ -46,6 +46,23 @@ class RetrievedKnowledgeSource:
     relevance_score: float
 
 
+@dataclass(frozen=True)
+class KnowledgeChunkCandidate:
+    document_id: UUID
+    document_name: str
+    document_type: str
+    product_area: str
+    tags: tuple[str, ...]
+    chunk_id: UUID
+    chunk_index: int
+    content: str
+
+
+class KnowledgeSourceRepository(Protocol):
+    async def list_indexed_chunks(self, *, limit: int = 50) -> list[KnowledgeChunkCandidate]:
+        pass
+
+
 class TicketKnowledgeRetriever(Protocol):
     async def retrieve(self, ticket: Ticket, *, limit: int = 3) -> list[RetrievedKnowledgeSource]:
         pass

@@ -26,6 +26,8 @@ from supportops_api.application.tickets import (
 )
 from supportops_api.application.response_suggestions import (
     GeneratedSuggestedResponse,
+    KnowledgeChunkCandidate,
+    KnowledgeSourceRepository,
     ResponseSuggestionGenerator,
     ResponseSuggestionRepository,
     RetrievedKnowledgeSource,
@@ -50,6 +52,8 @@ __all__ = [
     "GetDocument",
     "GetTicket",
     "GeneratedSuggestedResponse",
+    "KnowledgeChunkCandidate",
+    "KnowledgeSourceRepository",
     "ListDocuments",
     "ListTickets",
     "ProcessDocument",
