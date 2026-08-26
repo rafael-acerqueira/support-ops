@@ -24,6 +24,13 @@ from supportops_api.application.tickets import (
     TicketNotFoundError,
     TicketRepository,
 )
+from supportops_api.application.response_suggestions import (
+    GeneratedSuggestedResponse,
+    ResponseSuggestionGenerator,
+    ResponseSuggestionRepository,
+    RetrievedKnowledgeSource,
+    TicketKnowledgeRetriever,
+)
 
 __all__ = [
     "ActivateDocument",
@@ -42,10 +49,15 @@ __all__ = [
     "EnqueuedDocumentProcessing",
     "GetDocument",
     "GetTicket",
+    "GeneratedSuggestedResponse",
     "ListDocuments",
     "ListTickets",
     "ProcessDocument",
+    "ResponseSuggestionGenerator",
+    "ResponseSuggestionRepository",
+    "RetrievedKnowledgeSource",
     "StoredDocumentFile",
+    "TicketKnowledgeRetriever",
     "TicketNotFoundError",
     "TicketRepository",
 ]

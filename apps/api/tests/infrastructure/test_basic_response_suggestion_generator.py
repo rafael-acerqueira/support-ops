@@ -1,5 +1,8 @@
+from uuid import UUID
+
 import pytest
 
+from supportops_api.application.response_suggestions import RetrievedKnowledgeSource
 from supportops_api.domain.documents import ProductArea
 from supportops_api.domain.tickets import Ticket
 from supportops_api.infrastructure.suggestions import BasicResponseSuggestionGenerator
@@ -23,6 +26,41 @@ async def test_basic_response_suggestion_generator_returns_draft_content() -> No
     assert "Hi Acme Corp" in generated_response.content
     assert "billing export failed" in generated_response.content
     assert "Next steps:" in generated_response.content
+    assert "needs careful human review" in generated_response.content
     assert "SupportOps" in generated_response.content
-    assert generated_response.sources[0]["document_name"] == "billing-playbook.md"
-    assert generated_response.sources[0]["relevance_score"] == 0.82
+    assert generated_response.sources == []
+
+
+@pytest.mark.asyncio
+async def test_basic_response_suggestion_generator_uses_retrieved_sources() -> None:
+    generated_response = await BasicResponseSuggestionGenerator(FakeKnowledgeRetriever()).generate(
+        create_ticket()
+    )
+
+    assert "I reviewed the indexed internal sources" in generated_response.content
+    assert generated_response.sources == [
+        {
+            "document_id": "53585070-2a9b-4a59-b78e-e97daef49f1a",
+            "chunk_id": "fb27fd5f-3813-4977-97b5-e129439f7f6c",
+            "chunk_index": 0,
+            "document_name": "billing-playbook.md",
+            "document_type": "playbook",
+            "relevance_score": 0.91,
+            "excerpt": "Validate duplicate invoice charges before promising a refund.",
+        }
+    ]
+
+
+class FakeKnowledgeRetriever:
+    async def retrieve(self, ticket: Ticket, *, limit: int = 3) -> list[RetrievedKnowledgeSource]:
+        return [
+            RetrievedKnowledgeSource(
+                document_id=UUID("53585070-2a9b-4a59-b78e-e97daef49f1a"),
+                document_name="billing-playbook.md",
+                document_type="playbook",
+                chunk_id=UUID("fb27fd5f-3813-4977-97b5-e129439f7f6c"),
+                chunk_index=0,
+                content="Validate duplicate invoice charges before promising a refund.",
+                relevance_score=0.91,
+            )
+        ]
