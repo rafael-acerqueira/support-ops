@@ -23,7 +23,10 @@ from supportops_api.infrastructure.persistence import (
 from supportops_api.infrastructure.processing import BasicDocumentProcessor
 from supportops_api.infrastructure.queues import CeleryDocumentProcessingQueue
 from supportops_api.infrastructure.storage import get_local_document_storage
-from supportops_api.infrastructure.suggestions import BasicResponseSuggestionGenerator
+from supportops_api.infrastructure.suggestions import (
+    BasicResponseSuggestionGenerator,
+    PostgresTicketKnowledgeRetriever,
+)
 
 
 def get_document_repository(
@@ -60,5 +63,7 @@ def get_response_suggestion_repository(
     return PostgresResponseSuggestionRepository(session)
 
 
-def get_response_suggestion_generator() -> ResponseSuggestionGenerator:
-    return BasicResponseSuggestionGenerator()
+def get_response_suggestion_generator(
+    session: AsyncSession = Depends(get_session),
+) -> ResponseSuggestionGenerator:
+    return BasicResponseSuggestionGenerator(PostgresTicketKnowledgeRetriever(session))
