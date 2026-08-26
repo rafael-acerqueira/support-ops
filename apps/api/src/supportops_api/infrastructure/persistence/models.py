@@ -9,10 +9,21 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
+from sqlalchemy.types import UserDefinedType
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class Vector(UserDefinedType):
+    cache_ok = True
+
+    def __init__(self, dimensions: int) -> None:
+        self.dimensions = dimensions
+
+    def get_col_spec(self, **_kwargs: object) -> str:
+        return f"vector({self.dimensions})"
 
 
 class TicketRecord(Base):
@@ -103,6 +114,7 @@ class DocumentChunkRecord(Base):
     chunk_metadata: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, default=dict
     )
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
