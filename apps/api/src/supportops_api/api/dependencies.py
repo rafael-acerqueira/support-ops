@@ -10,13 +10,16 @@ from supportops_api.application.documents import (
     DocumentStorage,
 )
 from supportops_api.application.response_suggestions import (
+    KnowledgeSourceRepository,
     ResponseSuggestionGenerator,
     ResponseSuggestionRepository,
+    TicketKnowledgeRetriever,
 )
 from supportops_api.application.tickets import TicketRepository
 from supportops_api.infrastructure.database import get_session
 from supportops_api.infrastructure.persistence import (
     PostgresDocumentRepository,
+    PostgresDocumentChunkRepository,
     PostgresResponseSuggestionRepository,
     PostgresTicketRepository,
 )
@@ -25,7 +28,7 @@ from supportops_api.infrastructure.queues import CeleryDocumentProcessingQueue
 from supportops_api.infrastructure.storage import get_local_document_storage
 from supportops_api.infrastructure.suggestions import (
     BasicResponseSuggestionGenerator,
-    PostgresTicketKnowledgeRetriever,
+    BasicTicketKnowledgeRetriever,
 )
 
 
@@ -63,7 +66,19 @@ def get_response_suggestion_repository(
     return PostgresResponseSuggestionRepository(session)
 
 
-def get_response_suggestion_generator(
+def get_knowledge_source_repository(
     session: AsyncSession = Depends(get_session),
+) -> KnowledgeSourceRepository:
+    return PostgresDocumentChunkRepository(session)
+
+
+def get_ticket_knowledge_retriever(
+    repository: KnowledgeSourceRepository = Depends(get_knowledge_source_repository),
+) -> TicketKnowledgeRetriever:
+    return BasicTicketKnowledgeRetriever(repository)
+
+
+def get_response_suggestion_generator(
+    knowledge_retriever: TicketKnowledgeRetriever = Depends(get_ticket_knowledge_retriever),
 ) -> ResponseSuggestionGenerator:
-    return BasicResponseSuggestionGenerator(PostgresTicketKnowledgeRetriever(session))
+    return BasicResponseSuggestionGenerator(knowledge_retriever)
