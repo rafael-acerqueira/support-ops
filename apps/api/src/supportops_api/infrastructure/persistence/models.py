@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -24,6 +25,26 @@ class Vector(UserDefinedType):
 
     def get_col_spec(self, **_kwargs: object) -> str:
         return f"vector({self.dimensions})"
+
+    def bind_processor(self, _dialect: object) -> Callable[[Sequence[float] | None], str | None]:
+        def process(value: Sequence[float] | None) -> str | None:
+            if value is None:
+                return None
+
+            return f"[{','.join(str(float(item)) for item in value)}]"
+
+        return process
+
+    def result_processor(
+        self, _dialect: object, _coltype: object
+    ) -> Callable[[list[float] | str | None], list[float] | None]:
+        def process(value: list[float] | str | None) -> list[float] | None:
+            if value is None or isinstance(value, list):
+                return value
+
+            return [float(item) for item in value.strip("[]").split(",") if item]
+
+        return process
 
 
 class TicketRecord(Base):

@@ -8,6 +8,7 @@ from supportops_api.application.documents import (
     DocumentProcessor,
     DocumentRepository,
     DocumentStorage,
+    EmbeddingGenerator,
 )
 from supportops_api.application.response_suggestions import (
     KnowledgeSourceRepository,
@@ -17,9 +18,10 @@ from supportops_api.application.response_suggestions import (
 )
 from supportops_api.application.tickets import TicketRepository
 from supportops_api.infrastructure.database import get_session
+from supportops_api.infrastructure.embeddings import DeterministicEmbeddingGenerator
 from supportops_api.infrastructure.persistence import (
-    PostgresDocumentRepository,
     PostgresDocumentChunkRepository,
+    PostgresDocumentRepository,
     PostgresResponseSuggestionRepository,
     PostgresTicketRepository,
 )
@@ -46,6 +48,10 @@ def get_document_processor(
     storage: DocumentStorage = Depends(get_document_storage),
 ) -> DocumentProcessor:
     return BasicDocumentProcessor(storage)
+
+
+def get_embedding_generator() -> EmbeddingGenerator:
+    return DeterministicEmbeddingGenerator()
 
 
 def get_document_processing_queue(

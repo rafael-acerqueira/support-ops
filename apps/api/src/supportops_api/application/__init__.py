@@ -16,6 +16,15 @@ from supportops_api.application.documents import (
     ProcessDocument,
     StoredDocumentFile,
 )
+from supportops_api.application.response_suggestions import (
+    GeneratedSuggestedResponse,
+    KnowledgeChunkCandidate,
+    KnowledgeSourceRepository,
+    ResponseSuggestionGenerator,
+    ResponseSuggestionRepository,
+    RetrievedKnowledgeSource,
+    TicketKnowledgeRetriever,
+)
 from supportops_api.application.tickets import (
     ChangeTicketPriority,
     ChangeTicketStatus,
@@ -25,15 +34,6 @@ from supportops_api.application.tickets import (
     ListTickets,
     TicketNotFoundError,
     TicketRepository,
-)
-from supportops_api.application.response_suggestions import (
-    GeneratedSuggestedResponse,
-    KnowledgeChunkCandidate,
-    KnowledgeSourceRepository,
-    ResponseSuggestionGenerator,
-    ResponseSuggestionRepository,
-    RetrievedKnowledgeSource,
-    TicketKnowledgeRetriever,
 )
 
 __all__ = [

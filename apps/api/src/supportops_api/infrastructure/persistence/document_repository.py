@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import delete, select
@@ -127,6 +128,7 @@ def _chunk_to_record(chunk: DocumentChunk) -> DocumentChunkRecord:
         chunk_index=chunk.chunk_index,
         content=chunk.content,
         chunk_metadata=chunk.metadata,
+        embedding=list(chunk.embedding) if chunk.embedding is not None else None,
         created_at=chunk.created_at,
     )
 
@@ -138,5 +140,16 @@ def _record_to_chunk(record: DocumentChunkRecord) -> DocumentChunk:
         chunk_index=record.chunk_index,
         content=record.content,
         metadata=record.chunk_metadata,
+        embedding=_embedding_to_tuple(record.embedding),
         created_at=record.created_at,
     )
+
+
+def _embedding_to_tuple(value: Sequence[float] | str | None) -> tuple[float, ...] | None:
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        return tuple(float(item) for item in value.strip("[]").split(",") if item)
+
+    return tuple(float(item) for item in value)

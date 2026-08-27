@@ -6,8 +6,7 @@ from pathlib import Path
 from typing import BinaryIO
 from uuid import uuid4
 
-from supportops_api.application.documents import StoredDocumentFile
-from supportops_api.application.documents import DocumentStorage
+from supportops_api.application.documents import DocumentStorage, StoredDocumentFile
 
 
 class LocalDocumentStorage(DocumentStorage):

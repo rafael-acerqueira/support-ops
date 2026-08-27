@@ -1,8 +1,8 @@
-from supportops_api.infrastructure.persistence.document_repository import (
-    PostgresDocumentRepository,
-)
 from supportops_api.infrastructure.persistence.document_chunk_repository import (
     PostgresDocumentChunkRepository,
+)
+from supportops_api.infrastructure.persistence.document_repository import (
+    PostgresDocumentRepository,
 )
 from supportops_api.infrastructure.persistence.models import (
     Base,

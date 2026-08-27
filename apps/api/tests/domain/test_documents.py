@@ -110,3 +110,24 @@ def test_document_chunk_trims_content() -> None:
     chunk = DocumentChunk(document_id=uuid4(), chunk_index=1, content="  SLA response window  ")
 
     assert chunk.content == "SLA response window"
+
+
+def test_document_chunk_preserves_embedding_values() -> None:
+    chunk = DocumentChunk(
+        document_id=uuid4(),
+        chunk_index=1,
+        content="SLA response window",
+        embedding=(0.1, -0.2),
+    )
+
+    assert chunk.embedding == (0.1, -0.2)
+
+
+def test_document_chunk_rejects_empty_embedding() -> None:
+    with pytest.raises(ValueError, match="embedding cannot be empty"):
+        DocumentChunk(
+            document_id=uuid4(),
+            chunk_index=1,
+            content="SLA response window",
+            embedding=(),
+        )

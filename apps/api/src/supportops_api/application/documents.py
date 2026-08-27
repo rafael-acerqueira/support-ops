@@ -169,9 +169,15 @@ class DeactivateDocument:
 
 
 class ProcessDocument:
-    def __init__(self, repository: DocumentRepository, processor: DocumentProcessor) -> None:
+    def __init__(
+        self,
+        repository: DocumentRepository,
+        processor: DocumentProcessor,
+        embedding_generator: EmbeddingGenerator | None = None,
+    ) -> None:
         self._repository = repository
         self._processor = processor
+        self._embedding_generator = embedding_generator
 
     async def execute(self, document_id: UUID) -> Document:
         document = await self._repository.get(document_id)
@@ -183,6 +189,7 @@ class ProcessDocument:
 
         try:
             chunks = await self._processor.process(document)
+            chunks = await self._generate_embeddings(chunks)
             document.mark_indexed(chunk_count=len(chunks))
             await self._repository.replace_chunks(document.id, chunks)
         except Exception as exc:
@@ -192,3 +199,24 @@ class ProcessDocument:
             await self._repository.save(document)
 
         return document
+
+    async def _generate_embeddings(self, chunks: list[DocumentChunk]) -> list[DocumentChunk]:
+        if self._embedding_generator is None:
+            return chunks
+
+        embedded_chunks: list[DocumentChunk] = []
+        for chunk in chunks:
+            embedding = await self._embedding_generator.generate(chunk.content)
+            embedded_chunks.append(
+                DocumentChunk(
+                    id=chunk.id,
+                    document_id=chunk.document_id,
+                    chunk_index=chunk.chunk_index,
+                    content=chunk.content,
+                    metadata=chunk.metadata,
+                    embedding=embedding.values,
+                    created_at=chunk.created_at,
+                )
+            )
+
+        return embedded_chunks

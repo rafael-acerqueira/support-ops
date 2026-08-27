@@ -156,15 +156,20 @@ class DocumentChunk:
     chunk_index: int
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
+    embedding: tuple[float, ...] | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=_utcnow)
 
     def __post_init__(self) -> None:
         content = self.content.strip()
+        embedding = tuple(float(value) for value in self.embedding) if self.embedding else None
 
         if self.chunk_index < 0:
             raise ValueError("Chunk index cannot be negative")
         if not content:
             raise ValueError("Chunk content is required")
+        if self.embedding is not None and embedding is None:
+            raise ValueError("Chunk embedding cannot be empty")
 
         object.__setattr__(self, "content", content)
+        object.__setattr__(self, "embedding", embedding)
