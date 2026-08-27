@@ -80,8 +80,9 @@ def get_knowledge_source_repository(
 
 def get_ticket_knowledge_retriever(
     repository: KnowledgeSourceRepository = Depends(get_knowledge_source_repository),
+    embedding_generator: EmbeddingGenerator = Depends(get_embedding_generator),
 ) -> TicketKnowledgeRetriever:
-    return BasicTicketKnowledgeRetriever(repository)
+    return BasicTicketKnowledgeRetriever(repository, embedding_generator)
 
 
 def get_response_suggestion_generator(

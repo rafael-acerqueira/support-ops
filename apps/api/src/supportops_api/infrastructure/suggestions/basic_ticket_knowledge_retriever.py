@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from supportops_api.application.documents import EmbeddingGenerator
 from supportops_api.application.response_suggestions import (
     KnowledgeChunkCandidate,
     KnowledgeSourceRepository,
@@ -15,13 +16,22 @@ class BasicTicketKnowledgeRetriever(TicketKnowledgeRetriever):
     def __init__(
         self,
         repository: KnowledgeSourceRepository,
+        embedding_generator: EmbeddingGenerator | None = None,
         *,
         candidate_limit: int = 50,
     ) -> None:
         self._repository = repository
+        self._embedding_generator = embedding_generator
         self._candidate_limit = candidate_limit
 
     async def retrieve(self, ticket: Ticket, *, limit: int = 3) -> list[RetrievedKnowledgeSource]:
+        if self._embedding_generator is not None:
+            embedding = await self._embedding_generator.generate(_ticket_to_embedding_text(ticket))
+            return await self._repository.search_similar_chunks(
+                embedding=embedding.values,
+                limit=limit,
+            )
+
         candidates = await self._repository.list_indexed_chunks(limit=self._candidate_limit)
         ranked_sources = [
             RetrievedKnowledgeSource(
@@ -38,6 +48,19 @@ class BasicTicketKnowledgeRetriever(TicketKnowledgeRetriever):
         ranked_sources.sort(key=lambda source: source.relevance_score, reverse=True)
 
         return [source for source in ranked_sources if source.relevance_score > 0][:limit]
+
+
+def _ticket_to_embedding_text(ticket: Ticket) -> str:
+    return " ".join(
+        [
+            ticket.external_id,
+            ticket.customer_name,
+            ticket.customer_tier,
+            ticket.subject,
+            ticket.description,
+            ticket.product_area.value,
+        ]
+    )
 
 
 def _score_candidate(ticket: Ticket, candidate: KnowledgeChunkCandidate) -> float:

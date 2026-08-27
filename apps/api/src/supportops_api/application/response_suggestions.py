@@ -62,6 +62,14 @@ class KnowledgeSourceRepository(Protocol):
     async def list_indexed_chunks(self, *, limit: int = 50) -> list[KnowledgeChunkCandidate]:
         pass
 
+    async def search_similar_chunks(
+        self,
+        *,
+        embedding: tuple[float, ...],
+        limit: int = 3,
+    ) -> list[RetrievedKnowledgeSource]:
+        pass
+
 
 class TicketKnowledgeRetriever(Protocol):
     async def retrieve(self, ticket: Ticket, *, limit: int = 3) -> list[RetrievedKnowledgeSource]:
