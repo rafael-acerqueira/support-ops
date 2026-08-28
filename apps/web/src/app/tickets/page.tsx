@@ -132,6 +132,18 @@ function formatRelevanceScore(value?: number) {
   return `${Math.round(value * 100)}% match`;
 }
 
+function getReviewFeedback(status: SuggestedResponseStatus) {
+  if (status === 'approved') {
+    return 'This suggested response has been approved for this ticket.';
+  }
+
+  if (status === 'rejected') {
+    return 'This suggested response was rejected and should not be used as-is.';
+  }
+
+  return 'Review this draft before using it in a customer reply.';
+}
+
 function getTicketRisk(ticket: SupportTicket): RiskLevel {
   if (ticket.priority === 'urgent') return 'High';
   if (ticket.priority === 'high' || ticket.customer_tier === 'enterprise') return 'Medium';
@@ -904,7 +916,9 @@ export default function TicketsPage() {
                     !isGeneratingSuggestion &&
                     !suggestionError &&
                     latestSuggestedResponse && (
-                      <article className="suggested-response-card">
+                      <article
+                        className={`suggested-response-card ${latestSuggestedResponse.status}`}
+                      >
                         <div className="suggested-response-meta">
                           <span
                             className={`suggested-response-status ${latestSuggestedResponse.status}`}
@@ -981,27 +995,58 @@ export default function TicketsPage() {
                 <section className="detail-section">
                   <h3>Review</h3>
                   {latestSuggestedResponse ? (
-                    <div className="review-actions">
-                      <button
-                        className="secondary-button compact approve-action"
-                        type="button"
-                        disabled={reviewingSuggestionId === latestSuggestedResponse.id}
-                        onClick={() =>
-                          void reviewSuggestedResponse(latestSuggestedResponse, 'approve')
-                        }
+                    <div className="review-panel">
+                      <div
+                        className={`notice inline-notice review-feedback ${latestSuggestedResponse.status}`}
+                        role="status"
                       >
-                        Approve
-                      </button>
-                      <button
-                        className="secondary-button compact reject-action"
-                        type="button"
-                        disabled={reviewingSuggestionId === latestSuggestedResponse.id}
-                        onClick={() =>
-                          void reviewSuggestedResponse(latestSuggestedResponse, 'reject')
-                        }
-                      >
-                        Reject
-                      </button>
+                        {latestSuggestedResponse.status === 'approved' ? (
+                          <CheckCircle size={16} aria-hidden="true" />
+                        ) : latestSuggestedResponse.status === 'rejected' ? (
+                          <X size={16} aria-hidden="true" />
+                        ) : (
+                          <Clock size={16} aria-hidden="true" />
+                        )}
+                        {getReviewFeedback(latestSuggestedResponse.status)}
+                      </div>
+                      <div className="review-actions">
+                        <button
+                          className="secondary-button compact approve-action"
+                          type="button"
+                          disabled={
+                            reviewingSuggestionId === latestSuggestedResponse.id ||
+                            latestSuggestedResponse.status === 'approved'
+                          }
+                          onClick={() =>
+                            void reviewSuggestedResponse(latestSuggestedResponse, 'approve')
+                          }
+                        >
+                          {reviewingSuggestionId === latestSuggestedResponse.id ? (
+                            <Loader2 size={14} aria-hidden="true" />
+                          ) : (
+                            <CheckCircle size={14} aria-hidden="true" />
+                          )}
+                          {latestSuggestedResponse.status === 'approved' ? 'Approved' : 'Approve'}
+                        </button>
+                        <button
+                          className="secondary-button compact reject-action"
+                          type="button"
+                          disabled={
+                            reviewingSuggestionId === latestSuggestedResponse.id ||
+                            latestSuggestedResponse.status === 'rejected'
+                          }
+                          onClick={() =>
+                            void reviewSuggestedResponse(latestSuggestedResponse, 'reject')
+                          }
+                        >
+                          {reviewingSuggestionId === latestSuggestedResponse.id ? (
+                            <Loader2 size={14} aria-hidden="true" />
+                          ) : (
+                            <X size={14} aria-hidden="true" />
+                          )}
+                          {latestSuggestedResponse.status === 'rejected' ? 'Rejected' : 'Reject'}
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="placeholder-item">

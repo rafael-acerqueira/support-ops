@@ -1066,6 +1066,16 @@ tbody tr:last-child td {
   padding: 14px;
 }
 
+.suggested-response-card.approved {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.suggested-response-card.rejected {
+  border-color: rgba(220, 38, 38, 0.55);
+  background: rgba(220, 38, 38, 0.08);
+}
+
 .suggested-response-card p {
   margin: 0;
   color: #f1f5f9;
@@ -1114,8 +1124,37 @@ tbody tr:last-child td {
 
 .review-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
-  margin-top: 12px;
+}
+
+.review-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.review-feedback {
+  display: flex;
+  align-items: center;
+  margin: 12px 0 0;
+}
+
+.review-feedback.draft {
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #cbd5e1;
+}
+
+.review-feedback.approved {
+  border: 1px solid #10b981;
+  background: rgba(16, 185, 129, 0.16);
+  color: #10b981;
+}
+
+.review-feedback.rejected {
+  border: 1px solid #dc2626;
+  background: rgba(220, 38, 38, 0.16);
+  color: #fca5a5;
 }
 
 .approve-action:hover:not(:disabled) {
