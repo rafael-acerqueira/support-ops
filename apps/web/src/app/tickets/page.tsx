@@ -238,6 +238,10 @@ export default function TicketsPage() {
   );
   const SelectedStatusIcon = selectedTicket ? statusIcons[selectedTicket.status] : null;
   const latestSuggestedResponse = suggestedResponses[0] ?? null;
+  const previousSuggestedResponses = useMemo(
+    () => suggestedResponses.slice(1),
+    [suggestedResponses]
+  );
 
   const selectTicket = useCallback((ticketId: string) => {
     setSelectedTicketId(ticketId);
@@ -1051,6 +1055,56 @@ export default function TicketsPage() {
                   ) : (
                     <div className="placeholder-item">
                       Approval and rejection controls will be enabled after a draft response exists.
+                    </div>
+                  )}
+                </section>
+
+                <section className="detail-section">
+                  <div className="section-title-row">
+                    <h3>Suggestion history</h3>
+                    <Clock size={16} aria-hidden="true" />
+                  </div>
+                  {previousSuggestedResponses.length ? (
+                    <div className="suggestion-history-list">
+                      {previousSuggestedResponses.map((suggestion) => (
+                        <article
+                          className={`suggestion-history-item ${suggestion.status}`}
+                          key={suggestion.id}
+                        >
+                          <div className="suggestion-history-header">
+                            <span className={`suggested-response-status ${suggestion.status}`}>
+                              {suggestedResponseStatusLabels[suggestion.status]}
+                            </span>
+                            <span>{formatDate(suggestion.created_at)}</span>
+                          </div>
+                          <p>{suggestion.content}</p>
+                          {suggestion.sources.length ? (
+                            <div className="history-source-list">
+                              {suggestion.sources.map((source, index) => (
+                                <div
+                                  className="history-source-item"
+                                  key={source.chunk_id ?? `${source.document_name}-${index}`}
+                                >
+                                  <strong>{source.document_name ?? 'Source document'}</strong>
+                                  <span>{formatRelevanceScore(source.relevance_score)}</span>
+                                  <small>
+                                    {source.excerpt ?? 'No excerpt available for this source yet.'}
+                                  </small>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <small className="history-empty-sources">
+                              No sources were attached to this suggestion.
+                            </small>
+                          )}
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="placeholder-item">
+                      Previous suggestions will appear here after this ticket has more than one
+                      generated response.
                     </div>
                   )}
                 </section>
