@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -9,10 +10,41 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
+from sqlalchemy.types import UserDefinedType
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class Vector(UserDefinedType):
+    cache_ok = True
+
+    def __init__(self, dimensions: int) -> None:
+        self.dimensions = dimensions
+
+    def get_col_spec(self, **_kwargs: object) -> str:
+        return f"vector({self.dimensions})"
+
+    def bind_processor(self, _dialect: object) -> Callable[[Sequence[float] | None], str | None]:
+        def process(value: Sequence[float] | None) -> str | None:
+            if value is None:
+                return None
+
+            return f"[{','.join(str(float(item)) for item in value)}]"
+
+        return process
+
+    def result_processor(
+        self, _dialect: object, _coltype: object
+    ) -> Callable[[list[float] | str | None], list[float] | None]:
+        def process(value: list[float] | str | None) -> list[float] | None:
+            if value is None or isinstance(value, list):
+                return value
+
+            return [float(item) for item in value.strip("[]").split(",") if item]
+
+        return process
 
 
 class TicketRecord(Base):
@@ -103,6 +135,7 @@ class DocumentChunkRecord(Base):
     chunk_metadata: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, default=dict
     )
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

@@ -8,6 +8,7 @@ from supportops_api.application.documents import (
     CreateDocumentInput,
     DeactivateDocument,
     DocumentNotFoundError,
+    GeneratedEmbedding,
     GetDocument,
     ListDocuments,
     ProcessDocument,
@@ -63,6 +64,11 @@ class SuccessfulDocumentProcessor:
 class FailingDocumentProcessor:
     async def process(self, document: Document) -> list[DocumentChunk]:
         raise RuntimeError("Parser failed")
+
+
+class FakeEmbeddingGenerator:
+    async def generate(self, text: str) -> GeneratedEmbedding:
+        return GeneratedEmbedding(values=(float(len(text)),), model="fake")
 
 
 def create_uploaded_document() -> Document:
@@ -148,6 +154,23 @@ async def test_process_document_replaces_chunks_and_marks_document_indexed() -> 
     assert processed.status == DocumentStatus.INDEXED
     assert processed.chunk_count == 2
     assert len(repository.chunks[document.id]) == 2
+
+
+@pytest.mark.asyncio
+async def test_process_document_generates_chunk_embeddings_when_generator_is_provided() -> None:
+    repository = InMemoryDocumentRepository()
+    document = create_uploaded_document()
+    await repository.add(document)
+
+    await ProcessDocument(
+        repository,
+        SuccessfulDocumentProcessor(),
+        FakeEmbeddingGenerator(),
+    ).execute(document.id)
+
+    chunks = repository.chunks[document.id]
+    assert chunks[0].embedding == (38.0,)
+    assert chunks[1].embedding == (36.0,)
 
 
 @pytest.mark.asyncio

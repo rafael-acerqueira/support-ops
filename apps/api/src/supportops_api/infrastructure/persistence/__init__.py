@@ -1,3 +1,6 @@
+from supportops_api.infrastructure.persistence.document_chunk_repository import (
+    PostgresDocumentChunkRepository,
+)
 from supportops_api.infrastructure.persistence.document_repository import (
     PostgresDocumentRepository,
 )
@@ -19,6 +22,7 @@ __all__ = [
     "Base",
     "DocumentChunkRecord",
     "DocumentRecord",
+    "PostgresDocumentChunkRepository",
     "PostgresDocumentRepository",
     "PostgresResponseSuggestionRepository",
     "PostgresTicketRepository",

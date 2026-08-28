@@ -3,34 +3,68 @@ from __future__ import annotations
 from supportops_api.application.response_suggestions import (
     GeneratedSuggestedResponse,
     ResponseSuggestionGenerator,
+    RetrievedKnowledgeSource,
+    TicketKnowledgeRetriever,
 )
 from supportops_api.domain.tickets import Ticket
 
 
 class BasicResponseSuggestionGenerator(ResponseSuggestionGenerator):
+    def __init__(
+        self,
+        knowledge_retriever: TicketKnowledgeRetriever | None = None,
+        *,
+        source_limit: int = 3,
+    ) -> None:
+        self._knowledge_retriever = knowledge_retriever
+        self._source_limit = source_limit
+
     async def generate(self, ticket: Ticket) -> GeneratedSuggestedResponse:
-        content = (
-            f"Hi {ticket.customer_name},\n\n"
-            f"Thanks for reaching out about {ticket.subject.lower()}. "
-            "We reviewed the request and will follow the applicable internal policy for this case.\n\n"
-            "Next steps:\n"
-            "1. Validate the account and impacted product area.\n"
-            "2. Check the relevant support policy before taking action.\n"
-            "3. Reply with the approved resolution or escalation path.\n\n"
-            "Best,\nSupportOps"
+        knowledge_sources = (
+            await self._knowledge_retriever.retrieve(ticket, limit=self._source_limit)
+            if self._knowledge_retriever
+            else []
         )
-        sources = [
-            {
-                "document_name": f"{ticket.product_area.value}-playbook.md",
-                "document_type": "Playbook",
-                "relevance_score": 0.82,
-                "excerpt": "Validate the customer request against the relevant support playbook before confirming next steps.",
-            },
-            {
-                "document_name": "internal-support-policy.md",
-                "document_type": "Policy",
-                "relevance_score": 0.76,
-                "excerpt": "Support agents should avoid policy commitments until the account and impact are verified.",
-            },
-        ]
+
+        content = _build_content(ticket, knowledge_sources)
+        sources = [_source_to_response(source) for source in knowledge_sources]
         return GeneratedSuggestedResponse(content=content, sources=sources)
+
+
+def _build_content(ticket: Ticket, sources: list[RetrievedKnowledgeSource]) -> str:
+    context_note = (
+        "I reviewed the indexed internal sources most relevant to this request."
+        if sources
+        else "I could not find indexed internal sources for this request, so this draft needs careful human review before sending."
+    )
+
+    return (
+        f"Hi {ticket.customer_name},\n\n"
+        f"Thanks for reaching out about {ticket.subject.lower()}. "
+        f"{context_note}\n\n"
+        "Next steps:\n"
+        "1. Validate the account and impacted product area.\n"
+        "2. Confirm the applicable policy details before taking action.\n"
+        "3. Reply with the approved resolution or escalation path.\n\n"
+        "Best,\nSupportOps"
+    )
+
+
+def _source_to_response(source: RetrievedKnowledgeSource) -> dict[str, object]:
+    return {
+        "document_id": str(source.document_id),
+        "chunk_id": str(source.chunk_id),
+        "chunk_index": source.chunk_index,
+        "document_name": source.document_name,
+        "document_type": source.document_type,
+        "relevance_score": source.relevance_score,
+        "excerpt": _excerpt(source.content),
+    }
+
+
+def _excerpt(content: str, *, max_length: int = 280) -> str:
+    clean_content = " ".join(content.split())
+    if len(clean_content) <= max_length:
+        return clean_content
+
+    return f"{clean_content[: max_length - 3].rstrip()}..."

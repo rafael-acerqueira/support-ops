@@ -8,14 +8,19 @@ from supportops_api.application.documents import (
     DocumentProcessor,
     DocumentRepository,
     DocumentStorage,
+    EmbeddingGenerator,
 )
 from supportops_api.application.response_suggestions import (
+    KnowledgeSourceRepository,
     ResponseSuggestionGenerator,
     ResponseSuggestionRepository,
+    TicketKnowledgeRetriever,
 )
 from supportops_api.application.tickets import TicketRepository
 from supportops_api.infrastructure.database import get_session
+from supportops_api.infrastructure.embeddings import DeterministicEmbeddingGenerator
 from supportops_api.infrastructure.persistence import (
+    PostgresDocumentChunkRepository,
     PostgresDocumentRepository,
     PostgresResponseSuggestionRepository,
     PostgresTicketRepository,
@@ -23,7 +28,10 @@ from supportops_api.infrastructure.persistence import (
 from supportops_api.infrastructure.processing import BasicDocumentProcessor
 from supportops_api.infrastructure.queues import CeleryDocumentProcessingQueue
 from supportops_api.infrastructure.storage import get_local_document_storage
-from supportops_api.infrastructure.suggestions import BasicResponseSuggestionGenerator
+from supportops_api.infrastructure.suggestions import (
+    BasicResponseSuggestionGenerator,
+    BasicTicketKnowledgeRetriever,
+)
 
 
 def get_document_repository(
@@ -40,6 +48,10 @@ def get_document_processor(
     storage: DocumentStorage = Depends(get_document_storage),
 ) -> DocumentProcessor:
     return BasicDocumentProcessor(storage)
+
+
+def get_embedding_generator() -> EmbeddingGenerator:
+    return DeterministicEmbeddingGenerator()
 
 
 def get_document_processing_queue(
@@ -60,5 +72,20 @@ def get_response_suggestion_repository(
     return PostgresResponseSuggestionRepository(session)
 
 
-def get_response_suggestion_generator() -> ResponseSuggestionGenerator:
-    return BasicResponseSuggestionGenerator()
+def get_knowledge_source_repository(
+    session: AsyncSession = Depends(get_session),
+) -> KnowledgeSourceRepository:
+    return PostgresDocumentChunkRepository(session)
+
+
+def get_ticket_knowledge_retriever(
+    repository: KnowledgeSourceRepository = Depends(get_knowledge_source_repository),
+    embedding_generator: EmbeddingGenerator = Depends(get_embedding_generator),
+) -> TicketKnowledgeRetriever:
+    return BasicTicketKnowledgeRetriever(repository, embedding_generator)
+
+
+def get_response_suggestion_generator(
+    knowledge_retriever: TicketKnowledgeRetriever = Depends(get_ticket_knowledge_retriever),
+) -> ResponseSuggestionGenerator:
+    return BasicResponseSuggestionGenerator(knowledge_retriever)

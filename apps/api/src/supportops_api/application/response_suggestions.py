@@ -35,6 +35,47 @@ class GeneratedSuggestedResponse:
     sources: list[dict[str, Any]]
 
 
+@dataclass(frozen=True)
+class RetrievedKnowledgeSource:
+    document_id: UUID
+    document_name: str
+    document_type: str
+    chunk_id: UUID
+    chunk_index: int
+    content: str
+    relevance_score: float
+
+
+@dataclass(frozen=True)
+class KnowledgeChunkCandidate:
+    document_id: UUID
+    document_name: str
+    document_type: str
+    product_area: str
+    tags: tuple[str, ...]
+    chunk_id: UUID
+    chunk_index: int
+    content: str
+
+
+class KnowledgeSourceRepository(Protocol):
+    async def list_indexed_chunks(self, *, limit: int = 50) -> list[KnowledgeChunkCandidate]:
+        pass
+
+    async def search_similar_chunks(
+        self,
+        *,
+        embedding: tuple[float, ...],
+        limit: int = 3,
+    ) -> list[RetrievedKnowledgeSource]:
+        pass
+
+
+class TicketKnowledgeRetriever(Protocol):
+    async def retrieve(self, ticket: Ticket, *, limit: int = 3) -> list[RetrievedKnowledgeSource]:
+        pass
+
+
 class ResponseSuggestionGenerator(Protocol):
     async def generate(self, ticket: Ticket) -> GeneratedSuggestedResponse:
         pass

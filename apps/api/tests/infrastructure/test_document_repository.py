@@ -20,7 +20,11 @@ from supportops_api.infrastructure.persistence.document_repository import (
     _record_to_chunk,
     _record_to_document,
 )
-from supportops_api.infrastructure.persistence.models import DocumentChunkRecord, DocumentRecord
+from supportops_api.infrastructure.persistence.models import (
+    DocumentChunkRecord,
+    DocumentRecord,
+    Vector,
+)
 
 
 def create_indexed_document() -> Document:
@@ -37,6 +41,10 @@ def create_indexed_document() -> Document:
     document.start_processing()
     document.mark_indexed(chunk_count=2)
     return document
+
+
+def create_test_embedding(value: float) -> tuple[float, ...]:
+    return tuple(value for _ in range(1536))
 
 
 def test_document_record_roundtrip_preserves_domain_values() -> None:
@@ -62,6 +70,7 @@ def test_chunk_record_roundtrip_preserves_domain_values() -> None:
         chunk_index=1,
         content="Enterprise refunds require approval.",
         metadata={"section": "Refund policy"},
+        embedding=(0.1, -0.2, 0.3),
     )
 
     record = _chunk_to_record(chunk)
@@ -72,6 +81,21 @@ def test_chunk_record_roundtrip_preserves_domain_values() -> None:
     assert mapped_chunk.chunk_index == 1
     assert mapped_chunk.content == "Enterprise refunds require approval."
     assert mapped_chunk.metadata == {"section": "Refund policy"}
+    assert mapped_chunk.embedding == (0.1, -0.2, 0.3)
+
+
+def test_vector_type_converts_python_values_to_pgvector_text() -> None:
+    process = Vector(3).bind_processor(None)
+
+    assert process((0.1, -0.2, 0.3)) == "[0.1,-0.2,0.3]"
+    assert process(None) is None
+
+
+def test_vector_type_converts_pgvector_text_to_python_values() -> None:
+    process = Vector(3).result_processor(None, None)
+
+    assert process("[0.1,-0.2,0.3]") == [0.1, -0.2, 0.3]
+    assert process(None) is None
 
 
 @pytest.mark.asyncio
@@ -95,8 +119,18 @@ async def test_postgres_document_repository_persists_document_workflow() -> None
     document = create_indexed_document()
     document.deactivate()
     chunks = [
-        DocumentChunk(document_id=document.id, chunk_index=0, content="First chunk"),
-        DocumentChunk(document_id=document.id, chunk_index=1, content="Second chunk"),
+        DocumentChunk(
+            document_id=document.id,
+            chunk_index=0,
+            content="First chunk",
+            embedding=create_test_embedding(0.1),
+        ),
+        DocumentChunk(
+            document_id=document.id,
+            chunk_index=1,
+            content="Second chunk",
+            embedding=create_test_embedding(0.2),
+        ),
     ]
 
     try:
