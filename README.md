@@ -167,19 +167,24 @@ cd apps/workers && uv run celery -A src.celery_app flower --port=5555
 
 ### Documents
 
-- `POST /api/documents` - Upload document
+- `POST /api/documents/upload` - Upload document and enqueue processing
 - `GET /api/documents` - List documents
-- `GET /api/documents/{id}` - Get document
-- `GET /api/documents/{id}/versions` - Version history
-- `POST /api/documents/{id}/reindex` - Reindex embeddings
+- `GET /api/documents/{id}` - Get document detail
+- `POST /api/documents/{id}/process` - Reprocess chunks and embeddings
+- `POST /api/documents/{id}/activate` - Activate document
+- `POST /api/documents/{id}/deactivate` - Deactivate document
 
 ### Tickets
 
-- `GET /api/tickets` - List tickets
 - `POST /api/tickets` - Create ticket
+- `GET /api/tickets` - List tickets
 - `GET /api/tickets/{id}` - Get ticket detail
-- `PATCH /api/tickets/{id}` - Update ticket
-- `POST /api/tickets/{id}/generate-response` - Generate AI response
+- `PATCH /api/tickets/{id}/priority` - Update ticket priority
+- `PATCH /api/tickets/{id}/status` - Update ticket status
+- `POST /api/tickets/{id}/suggested-responses` - Generate suggested response
+- `GET /api/tickets/{id}/suggested-responses` - List suggested responses
+- `PATCH /api/tickets/{id}/suggested-responses/{suggestion_id}/approve` - Approve suggested response
+- `PATCH /api/tickets/{id}/suggested-responses/{suggestion_id}/reject` - Reject suggested response
 
 ### Evaluations
 
@@ -288,10 +293,15 @@ docker build -t supportops-workers:latest apps/workers -f apps/workers/Dockerfil
 ### Phase 1 - MVP (Weeks 1-2)
 
 - ✅ Scaffold monorepo
-- Document upload & versioning
-- Basic RAG pipeline
-- Frontend for documents & tickets
-- Human review workflow
+- ✅ Local development infrastructure
+- ✅ Document upload and processing
+- ✅ Document chunks and deterministic embeddings
+- ✅ Basic RAG retrieval with pgvector
+- ✅ Frontend for documents and tickets
+- ✅ Manual ticket creation
+- ✅ Suggested response workflow
+- ✅ Human review actions for suggestions
+- Document versioning
 
 ### Phase 2 - Production Ready (Weeks 3-4)
 
