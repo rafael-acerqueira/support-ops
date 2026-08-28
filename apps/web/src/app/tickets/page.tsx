@@ -6,6 +6,7 @@ import {
   CheckCircle,
   Clock,
   Eye,
+  FileText,
   Loader2,
   MessageSquare,
   RefreshCw,
@@ -30,6 +31,9 @@ type ProductArea = 'billing' | 'security' | 'support' | 'api' | 'product' | 'leg
 type FilterValue = 'all' | string;
 
 type SuggestedResponseSource = {
+  document_id?: string;
+  chunk_id?: string;
+  chunk_index?: number;
   document_name?: string;
   document_type?: string;
   relevance_score?: number;
@@ -120,6 +124,12 @@ function humanize(value: string) {
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+function formatRelevanceScore(value?: number) {
+  if (typeof value !== 'number') return 'No score';
+
+  return `${Math.round(value * 100)}% match`;
 }
 
 function getTicketRisk(ticket: SupportTicket): RiskLevel {
@@ -925,21 +935,45 @@ export default function TicketsPage() {
                   {latestSuggestedResponse?.sources.length ? (
                     <div className="source-list">
                       {latestSuggestedResponse.sources.map((source, index) => (
-                        <article className="source-item" key={`${source.document_name}-${index}`}>
+                        <article
+                          className="source-item"
+                          key={source.chunk_id ?? `${source.document_name}-${index}`}
+                        >
                           <div className="source-item-header">
-                            <strong>{source.document_name ?? 'Source document'}</strong>
-                            {typeof source.relevance_score === 'number' && (
-                              <span>{Math.round(source.relevance_score * 100)}%</span>
-                            )}
+                            <div className="source-title">
+                              <FileText size={15} aria-hidden="true" />
+                              <div>
+                                <strong>{source.document_name ?? 'Source document'}</strong>
+                                <span>
+                                  {source.document_type
+                                    ? humanize(source.document_type)
+                                    : 'Document'}
+                                  {typeof source.chunk_index === 'number'
+                                    ? ` / chunk ${source.chunk_index + 1}`
+                                    : ''}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="source-score">
+                              {formatRelevanceScore(source.relevance_score)}
+                            </span>
                           </div>
-                          <p>{source.excerpt ?? 'No excerpt available for this source yet.'}</p>
-                          {source.document_type && <small>{source.document_type}</small>}
+                          <blockquote>
+                            {source.excerpt ?? 'No excerpt available for this source yet.'}
+                          </blockquote>
+                          {source.document_id && (
+                            <small className="source-reference">
+                              Document ID {source.document_id.slice(0, 8)}
+                            </small>
+                          )}
                         </article>
                       ))}
                     </div>
                   ) : (
-                    <div className="placeholder-item">
-                      Sources will be shown after a suggested response retrieves document chunks.
+                    <div className="placeholder-item source-empty-state">
+                      <BookOpen size={16} aria-hidden="true" />
+                      Sources will appear here when the suggested response retrieves matching
+                      document chunks.
                     </div>
                   )}
                 </section>

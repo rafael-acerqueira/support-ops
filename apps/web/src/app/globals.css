@@ -1130,17 +1130,17 @@ tbody tr:last-child td {
 
 .source-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin-top: 12px;
 }
 
 .source-item {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   border: 1px solid #475569;
   border-radius: 8px;
-  background: #0f172a;
-  padding: 12px;
+  background: #111827;
+  padding: 14px;
 }
 
 .source-item-header {
@@ -1150,7 +1150,26 @@ tbody tr:last-child td {
   gap: 12px;
 }
 
-.source-item-header strong {
+.source-title {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.source-title svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #0ea5e9;
+}
+
+.source-title div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.source-title strong {
   overflow: hidden;
   color: #f1f5f9;
   font-size: 13px;
@@ -1159,19 +1178,45 @@ tbody tr:last-child td {
   white-space: nowrap;
 }
 
-.source-item-header span,
-.source-item small {
+.source-title span,
+.source-reference {
   color: #94a3b8;
   font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   font-size: 11px;
   line-height: 1.4;
 }
 
-.source-item p {
+.source-score {
+  flex: 0 0 auto;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.1);
+  color: #7dd3fc;
+  padding: 4px 8px;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.source-item blockquote {
   margin: 0;
+  border-left: 2px solid #0ea5e9;
   color: #cbd5e1;
-  font-size: 12px;
-  line-height: 1.5;
+  padding-left: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.source-reference {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .section-title-row svg {
