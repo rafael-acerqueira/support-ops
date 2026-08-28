@@ -1167,6 +1167,88 @@ tbody tr:last-child td {
   background: rgba(220, 38, 38, 0.12);
 }
 
+.suggestion-history-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.suggestion-history-item {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  padding: 12px;
+}
+
+.suggestion-history-item.approved {
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+.suggestion-history-item.rejected {
+  border-color: rgba(220, 38, 38, 0.45);
+}
+
+.suggestion-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #94a3b8;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.suggestion-history-item p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  -webkit-box-orient: vertical;
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1.55;
+  -webkit-line-clamp: 4;
+}
+
+.history-source-list {
+  display: grid;
+  gap: 8px;
+}
+
+.history-source-item {
+  display: grid;
+  gap: 4px;
+  border-left: 2px solid #0ea5e9;
+  padding-left: 10px;
+}
+
+.history-source-item strong {
+  overflow: hidden;
+  color: #f1f5f9;
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-source-item span,
+.history-source-item small,
+.history-empty-sources {
+  color: #94a3b8;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.history-source-item small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .source-list {
   display: grid;
   gap: 12px;
