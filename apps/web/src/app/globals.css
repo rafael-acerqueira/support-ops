@@ -534,13 +534,21 @@ tbody tr:last-child td {
 
 .empty-state {
   min-height: 220px;
+  flex-direction: column;
   justify-content: center;
   gap: 10px;
   color: #cbd5e1;
+  text-align: center;
 }
 
 .empty-state svg {
   color: #0ea5e9;
+}
+
+.empty-state span {
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .spin {
@@ -598,6 +606,43 @@ tbody tr:last-child td {
 .detail-actions {
   gap: 8px;
   margin-top: 16px;
+}
+
+.document-readiness {
+  display: grid;
+  gap: 4px;
+  margin-top: 16px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  padding: 12px;
+}
+
+.document-readiness strong {
+  color: #f1f5f9;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.document-readiness span {
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.document-readiness.success {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.document-readiness.warning {
+  border-color: rgba(249, 115, 22, 0.55);
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.document-readiness.error {
+  border-color: rgba(220, 38, 38, 0.55);
+  background: rgba(220, 38, 38, 0.08);
 }
 
 .primary-button.compact,

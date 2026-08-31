@@ -27,6 +27,7 @@ type DocumentType =
   | 'faq'
   | 'technical_documentation';
 type ProductArea = 'billing' | 'security' | 'support' | 'api' | 'product' | 'legal';
+type DocumentReadinessTone = 'success' | 'warning' | 'error';
 
 type KnowledgeDocument = {
   id: string;
@@ -104,6 +105,50 @@ function humanize(value: string) {
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+function getDocumentReadiness(document: KnowledgeDocument): {
+  label: string;
+  message: string;
+  tone: DocumentReadinessTone;
+} {
+  if (!document.storage_key) {
+    return {
+      label: 'Missing file reference',
+      message: 'This document cannot be reprocessed because no stored file is attached.',
+      tone: 'warning',
+    };
+  }
+
+  if (document.status === 'failed') {
+    return {
+      label: 'Processing failed',
+      message: document.failure_reason ?? 'Review the source file and try reprocessing.',
+      tone: 'error',
+    };
+  }
+
+  if (document.status === 'indexed') {
+    return {
+      label: 'Ready for retrieval',
+      message: `${document.chunk_count} chunks are indexed and available for ticket suggestions.`,
+      tone: 'success',
+    };
+  }
+
+  if (document.status === 'processing') {
+    return {
+      label: 'Processing in progress',
+      message: 'SupportOps is extracting chunks and generating embeddings for this document.',
+      tone: 'warning',
+    };
+  }
+
+  return {
+    label: 'Awaiting processing',
+    message: 'This document has been uploaded and is waiting for processing.',
+    tone: 'warning',
+  };
 }
 
 export default function DocumentsPage() {
@@ -296,6 +341,7 @@ export default function DocumentsPage() {
 
   const SelectedStatusIcon = selectedDocument ? statusIcons[selectedDocument.status] : null;
   const selectedIsBusy = selectedDocument ? busyDocumentId === selectedDocument.id : false;
+  const selectedReadiness = selectedDocument ? getDocumentReadiness(selectedDocument) : null;
 
   return (
     <main className="shell">
@@ -512,8 +558,12 @@ export default function DocumentsPage() {
                                 event.stopPropagation();
                                 void postDocumentAction(document.id, 'process');
                               }}
-                              disabled={isBusy}
-                              title="Reprocess"
+                              disabled={isBusy || !document.storage_key}
+                              title={
+                                document.storage_key
+                                  ? 'Reprocess'
+                                  : 'Cannot reprocess without a stored file'
+                              }
                             >
                               {isBusy ? (
                                 <Loader2 className="spin" size={16} aria-hidden="true" />
@@ -552,6 +602,7 @@ export default function DocumentsPage() {
                         <div className="empty-state">
                           <FileText size={24} aria-hidden="true" />
                           <strong>No documents registered</strong>
+                          <span>Upload a policy, playbook, FAQ, or technical document.</span>
                         </div>
                       </td>
                     </tr>
@@ -589,7 +640,12 @@ export default function DocumentsPage() {
                     className="primary-button compact"
                     type="button"
                     onClick={() => void postDocumentAction(selectedDocument.id, 'process')}
-                    disabled={selectedIsBusy}
+                    disabled={selectedIsBusy || !selectedDocument.storage_key}
+                    title={
+                      selectedDocument.storage_key
+                        ? 'Reprocess document'
+                        : 'Cannot reprocess without a stored file'
+                    }
                   >
                     {selectedIsBusy ? (
                       <Loader2 className="spin" size={16} aria-hidden="true" />
@@ -617,6 +673,13 @@ export default function DocumentsPage() {
                     {selectedDocument.is_active ? 'Deactivate' : 'Activate'}
                   </button>
                 </div>
+
+                {selectedReadiness && (
+                  <div className={`document-readiness ${selectedReadiness.tone}`} role="status">
+                    <strong>{selectedReadiness.label}</strong>
+                    <span>{selectedReadiness.message}</span>
+                  </div>
+                )}
 
                 <dl className="detail-grid">
                   <div>
