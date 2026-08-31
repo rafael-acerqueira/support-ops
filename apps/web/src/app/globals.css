@@ -645,6 +645,43 @@ tbody tr:last-child td {
   background: rgba(220, 38, 38, 0.08);
 }
 
+.ticket-readiness {
+  display: grid;
+  gap: 4px;
+  margin-top: 16px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  padding: 12px;
+}
+
+.ticket-readiness strong {
+  color: #f1f5f9;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.ticket-readiness span {
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ticket-readiness.success {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.ticket-readiness.warning {
+  border-color: rgba(249, 115, 22, 0.55);
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.ticket-readiness.neutral {
+  border-color: rgba(14, 165, 233, 0.45);
+  background: rgba(14, 165, 233, 0.08);
+}
+
 .primary-button.compact,
 .secondary-button.compact {
   min-height: 38px;
