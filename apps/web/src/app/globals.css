@@ -1157,6 +1157,18 @@ tbody tr:last-child td {
   color: #fca5a5;
 }
 
+.confidence-notice {
+  display: flex;
+  align-items: center;
+}
+
+.confidence-notice.none,
+.confidence-notice.low {
+  border: 1px solid #f97316;
+  background: rgba(249, 115, 22, 0.14);
+  color: #fdba74;
+}
+
 .approve-action:hover:not(:disabled) {
   border-color: #10b981;
   background: rgba(16, 185, 129, 0.12);
@@ -1224,6 +1236,10 @@ tbody tr:last-child td {
   padding-left: 10px;
 }
 
+.history-source-item.low-confidence {
+  border-left-color: #f97316;
+}
+
 .history-source-item strong {
   overflow: hidden;
   color: #f1f5f9;
@@ -1262,6 +1278,11 @@ tbody tr:last-child td {
   border-radius: 8px;
   background: #111827;
   padding: 14px;
+}
+
+.source-item.low-confidence {
+  border-color: rgba(249, 115, 22, 0.5);
+  background: rgba(249, 115, 22, 0.08);
 }
 
 .source-item-header {
@@ -1319,6 +1340,12 @@ tbody tr:last-child td {
   line-height: 1.4;
 }
 
+.source-score.low-confidence {
+  border-color: rgba(249, 115, 22, 0.45);
+  background: rgba(249, 115, 22, 0.12);
+  color: #fdba74;
+}
+
 .source-item blockquote {
   margin: 0;
   border-left: 2px solid #0ea5e9;
@@ -1338,6 +1365,12 @@ tbody tr:last-child td {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.source-empty-state.low-confidence {
+  border-color: rgba(249, 115, 22, 0.5);
+  background: rgba(249, 115, 22, 0.1);
+  color: #fdba74;
 }
 
 .section-title-row svg {
