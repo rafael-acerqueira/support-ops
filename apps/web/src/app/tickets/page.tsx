@@ -30,6 +30,7 @@ type RiskLevel = 'Low' | 'Medium' | 'High';
 type ProductArea = 'billing' | 'security' | 'support' | 'api' | 'product' | 'legal';
 type FilterValue = 'all' | string;
 type SuggestionConfidence = 'supported' | 'low' | 'none';
+type TicketReadinessTone = 'success' | 'warning' | 'neutral';
 
 type SuggestedResponseSource = {
   document_id?: string;
@@ -176,6 +177,63 @@ function getReviewFeedback(status: SuggestedResponseStatus) {
   return 'Review this draft before using it in a customer reply.';
 }
 
+function getTicketReadiness(
+  ticket: SupportTicket,
+  suggestion: SuggestedResponse | null,
+  confidence: SuggestionConfidence | null
+): {
+  label: string;
+  message: string;
+  tone: TicketReadinessTone;
+} {
+  if (!suggestion) {
+    return {
+      label: 'Ready for response drafting',
+      message:
+        'Generate a suggested response to retrieve sources and prepare this ticket for review.',
+      tone: shouldEscalateTicket(ticket) ? 'warning' : 'neutral',
+    };
+  }
+
+  if (suggestion.status === 'approved') {
+    return {
+      label: 'Response approved',
+      message: 'The latest suggestion has been approved by a reviewer.',
+      tone: 'success',
+    };
+  }
+
+  if (suggestion.status === 'rejected') {
+    return {
+      label: 'Response rejected',
+      message: 'Generate a new suggestion or revise the response before replying to the customer.',
+      tone: 'warning',
+    };
+  }
+
+  if (confidence === 'none') {
+    return {
+      label: 'Draft needs source review',
+      message: 'The latest suggestion has no retrieved sources attached.',
+      tone: 'warning',
+    };
+  }
+
+  if (confidence === 'low') {
+    return {
+      label: 'Draft has low-confidence sources',
+      message: 'Review the retrieved sources carefully before approving this response.',
+      tone: 'warning',
+    };
+  }
+
+  return {
+    label: 'Draft ready for review',
+    message: 'The latest suggestion is backed by retrieved sources and awaits approval.',
+    tone: 'success',
+  };
+}
+
 function getTicketRisk(ticket: SupportTicket): RiskLevel {
   if (ticket.priority === 'urgent') return 'High';
   if (ticket.priority === 'high' || ticket.customer_tier === 'enterprise') return 'Medium';
@@ -272,6 +330,9 @@ export default function TicketsPage() {
   const latestSuggestedResponse = suggestedResponses[0] ?? null;
   const latestSuggestionConfidence = latestSuggestedResponse
     ? getSuggestionConfidence(latestSuggestedResponse)
+    : null;
+  const selectedTicketReadiness = selectedTicket
+    ? getTicketReadiness(selectedTicket, latestSuggestedResponse, latestSuggestionConfidence)
     : null;
   const previousSuggestedResponses = useMemo(
     () => suggestedResponses.slice(1),
@@ -788,6 +849,11 @@ export default function TicketsPage() {
                               ? 'No tickets registered'
                               : 'No tickets match the current filters'}
                           </strong>
+                          <span>
+                            {tickets.length === 0
+                              ? 'Create a ticket to start support triage.'
+                              : 'Adjust filters or search terms to find a matching ticket.'}
+                          </span>
                         </div>
                       </td>
                     </tr>
@@ -835,6 +901,13 @@ export default function TicketsPage() {
                     {isGeneratingSuggestion ? 'Generating...' : 'Suggest response'}
                   </button>
                 </div>
+
+                {selectedTicketReadiness && (
+                  <div className={`ticket-readiness ${selectedTicketReadiness.tone}`} role="status">
+                    <strong>{selectedTicketReadiness.label}</strong>
+                    <span>{selectedTicketReadiness.message}</span>
+                  </div>
+                )}
 
                 <dl className="detail-grid">
                   <div>
