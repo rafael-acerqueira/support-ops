@@ -301,10 +301,14 @@ docker build -t supportops-workers:latest apps/workers -f apps/workers/Dockerfil
 - ✅ Manual ticket creation
 - ✅ Suggested response workflow
 - ✅ Human review actions for suggestions
-- Document versioning
+- ✅ Manual MVP test flow documentation
+- Deterministic local RAG only; real AI providers move to Phase 2
 
 ### Phase 2 - Production Ready (Weeks 3-4)
 
+- Real embedding provider
+- LLM response generation
+- Document versioning
 - Reranking
 - Confidence scoring
 - Metrics & evaluation

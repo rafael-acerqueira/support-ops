@@ -12,8 +12,9 @@
 
 ### Domain Layer
 
-- [ ] Document, DocumentVersion, Chunk entities
-- [ ] Ticket, AIAnalysis, AIResponse entities
+- [x] Document and Chunk entities
+- [x] Ticket and SuggestedResponse entities
+- [ ] DocumentVersion entity
 - [ ] User, Review entities
 - [ ] VersioningPolicy domain service
 - [ ] ConfidenceScorer domain service
@@ -21,79 +22,93 @@
 
 ### Application Layer
 
-- [ ] IngestDocument use-case
-- [ ] ProcessDocumentVersion use-case
+- [x] CreateDocument use-case
+- [x] ProcessDocument use-case
+- [x] GenerateSuggestedResponse use-case
+- [x] ApproveSuggestedResponse and RejectSuggestedResponse use-cases
+- [x] ListDocuments use-case
+- [x] ListTickets use-case
+- [x] GetTicket detail use-case
+- [x] Deterministic source retrieval for suggestions
 - [ ] GenerateAIAnalysis use-case
-- [ ] GenerateResponse use-case
-- [ ] ReviewResponse use-case
-- [ ] ListDocuments use-case
-- [ ] ListTickets use-case
-- [ ] GetTicketDetail use-case
 
 ### Ports (Interfaces)
 
-- [ ] DocumentRepository, ChunkRepository, TicketRepository, ReviewRepository
-- [ ] DocumentStoragePort, VectorSearchPort, EmbeddingStorePort
-- [ ] LLMClientPort, QueuePort, MetricsPort
-- [ ] Contract definitions for each port
+- [x] DocumentRepository, KnowledgeSourceRepository, TicketRepository, ResponseSuggestionRepository
+- [x] DocumentStorage, DocumentProcessingQueue, DocumentProcessor, EmbeddingGenerator
+- [x] TicketKnowledgeRetriever and ResponseSuggestionGenerator contracts
+- [ ] LLMClientPort, MetricsPort
+- [ ] Dedicated contract tests for each port
 
 ### Adapters (Postgres + S3/MinIO + pgvector)
 
-- [ ] SQLAlchemy models (Document, DocumentVersion, Chunk, etc.)
-- [ ] Database migrations (Alembic)
-- [ ] PostgresDocumentRepository implementation
-- [ ] PostgresChunkRepository implementation
-- [ ] PostgresTicketRepository implementation
-- [ ] S3DocumentStorageAdapter (MinIO for dev)
-- [ ] PGVectorSearchAdapter
-- [ ] Basic EmbeddingStoreAdapter (OpenAI)
-- [ ] FastAPI wiring/dependency injection
+- [x] SQLAlchemy models for documents, document chunks, tickets, and suggested responses
+- [x] Database migrations (Alembic)
+- [x] PostgresDocumentRepository implementation
+- [x] PostgresDocumentChunkRepository implementation
+- [x] PostgresTicketRepository implementation
+- [x] PostgresResponseSuggestionRepository implementation
+- [x] LocalDocumentStorage adapter
+- [x] pgvector search through PostgresDocumentChunkRepository
+- [x] DeterministicEmbeddingGenerator for local development
+- [x] FastAPI wiring/dependency injection
+- [ ] S3DocumentStorageAdapter (MinIO/S3)
+- [ ] OpenAI embedding adapter
 
 ### API (FastAPI)
 
-- [ ] POST /api/documents (upload)
-- [ ] GET /api/documents (list)
-- [ ] GET /api/documents/{id} (detail)
+- [x] POST /api/documents/upload
+- [x] GET /api/documents
+- [x] GET /api/documents/{id}
+- [x] POST /api/documents/{id}/process
+- [x] POST /api/documents/{id}/activate
+- [x] POST /api/documents/{id}/deactivate
+- [x] POST /api/tickets
+- [x] GET /api/tickets
+- [x] GET /api/tickets/{id}
+- [x] PATCH /api/tickets/{id}/priority
+- [x] PATCH /api/tickets/{id}/status
+- [x] POST /api/tickets/{id}/suggested-responses
+- [x] GET /api/tickets/{id}/suggested-responses
+- [x] PATCH /api/tickets/{id}/suggested-responses/{suggestion_id}/approve
+- [x] PATCH /api/tickets/{id}/suggested-responses/{suggestion_id}/reject
 - [ ] GET /api/documents/{id}/versions
-- [ ] POST /api/documents/{id}/reindex
-- [ ] GET /api/tickets
-- [ ] GET /api/tickets/{id}
-- [ ] POST /api/tickets/{id}/generate-response (basic)
-- [ ] PATCH /api/tickets/{id}
 - [ ] GET /api/evaluations/summary (basic)
 
 ### Workers (Celery)
 
-- [ ] Celery app setup + Redis broker
-- [ ] DocumentProcessingTask (parsing, chunking)
-- [ ] EmbeddingGenerationTask (call OpenAI)
-- [ ] VectorIndexingTask
-- [ ] Task status tracking
+- [x] Celery app setup + Redis broker
+- [x] DocumentProcessingTask (parsing, chunking, deterministic embeddings)
+- [x] Task status reflected through document status
+- [ ] EmbeddingGenerationTask with real provider
+- [ ] Dedicated VectorIndexingTask
 
 ### Frontend (Next.js)
 
-- [ ] Layout + Header + Sidebar
-- [ ] /documents page (upload form + list)
-- [ ] /tickets page (list + filters)
-- [ ] /tickets/[id] page (detail + AI response preview)
+- [x] Layout + header navigation
+- [x] /documents page (upload form, list, detail, processing feedback)
+- [x] /tickets page (create form, list, filters, detail)
+- [x] Ticket detail panel with suggested response, sources, review, and history
 - [ ] /evaluations page (basic metrics)
-- [ ] API client wrapper (axios + SWR)
+- [ ] API client wrapper
 - [ ] Dark mode toggle (next-themes)
 
 ### Testing
 
-- [ ] Unit tests for domain services
-- [ ] Unit tests for use-cases
-- [ ] Contract tests for adapters
-- [ ] API endpoint tests
+- [x] Unit tests for domain entities
+- [x] Unit tests for use-cases
+- [x] Adapter tests
+- [x] API endpoint tests
+- [x] Worker tests
 - [ ] Frontend component tests
 
 ### Documentation
 
-- [ ] README with setup instructions
-- [ ] Architecture.md (hexagonal design)
-- [ ] Design System doc
-- [ ] API docs (auto-generated by FastAPI)
+- [x] README with setup instructions
+- [x] QUICKSTART with manual MVP test flow
+- [x] Architecture.md (hexagonal design)
+- [x] Design System doc
+- [x] API docs (auto-generated by FastAPI)
 
 ---
 
@@ -101,6 +116,9 @@
 
 ### Advanced RAG Features
 
+- [ ] Real embedding provider
+- [ ] LLM response generation from retrieved sources
+- [ ] Document versioning
 - [ ] Reranking (cross-encoder or LLM-based)
 - [ ] Hybrid retrieval (keyword + vector + rerank)
 - [ ] Confidence scoring refinement
