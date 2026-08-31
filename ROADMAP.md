@@ -1,6 +1,12 @@
 # SupportOps - Implementation Roadmap
 
-## Phase 1: MVP Foundation (Week 1-2)
+## Phase 1: MVP Foundation (Complete)
+
+Status: completed and manually validated as a local deterministic MVP.
+
+Scope note: Phase 1 intentionally uses deterministic local embeddings and deterministic response
+drafts. Real AI providers, document versioning, production observability, and evaluation workflows
+are tracked in Phase 2+.
 
 ### Infrastructure & Setup
 
