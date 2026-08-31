@@ -29,6 +29,7 @@ type SuggestedResponseStatus = 'draft' | 'approved' | 'rejected';
 type RiskLevel = 'Low' | 'Medium' | 'High';
 type ProductArea = 'billing' | 'security' | 'support' | 'api' | 'product' | 'legal';
 type FilterValue = 'all' | string;
+type SuggestionConfidence = 'supported' | 'low' | 'none';
 
 type SuggestedResponseSource = {
   document_id?: string;
@@ -97,6 +98,7 @@ const statusIcons = {
 
 const statusOptions = Object.entries(statusLabels) as Array<[TicketStatus, string]>;
 const priorityOptions = Object.entries(priorityLabels) as Array<[TicketPriority, string]>;
+const lowConfidenceThreshold = 0.5;
 const productAreaOptions: Array<{ value: ProductArea; label: string }> = [
   { value: 'billing', label: 'Billing' },
   { value: 'security', label: 'Security' },
@@ -130,6 +132,36 @@ function formatRelevanceScore(value?: number) {
   if (typeof value !== 'number') return 'No score';
 
   return `${Math.round(value * 100)}% match`;
+}
+
+function getSuggestionConfidence(suggestion: SuggestedResponse): SuggestionConfidence {
+  if (suggestion.sources.length === 0) return 'none';
+
+  const scores = suggestion.sources
+    .map((source) => source.relevance_score)
+    .filter((score): score is number => typeof score === 'number');
+
+  if (!scores.length) return 'low';
+
+  return Math.max(...scores) >= lowConfidenceThreshold ? 'supported' : 'low';
+}
+
+function getSuggestionConfidenceMessage(confidence: SuggestionConfidence) {
+  if (confidence === 'none') {
+    return 'No document sources were found for this suggestion. Review carefully before using it.';
+  }
+
+  if (confidence === 'low') {
+    return 'The retrieved sources have low relevance. Validate the answer against internal policy before using it.';
+  }
+
+  return 'This suggestion is backed by retrieved document sources.';
+}
+
+function isLowConfidenceSource(source: SuggestedResponseSource) {
+  return (
+    typeof source.relevance_score !== 'number' || source.relevance_score < lowConfidenceThreshold
+  );
 }
 
 function getReviewFeedback(status: SuggestedResponseStatus) {
@@ -238,6 +270,9 @@ export default function TicketsPage() {
   );
   const SelectedStatusIcon = selectedTicket ? statusIcons[selectedTicket.status] : null;
   const latestSuggestedResponse = suggestedResponses[0] ?? null;
+  const latestSuggestionConfidence = latestSuggestedResponse
+    ? getSuggestionConfidence(latestSuggestedResponse)
+    : null;
   const previousSuggestedResponses = useMemo(
     () => suggestedResponses.slice(1),
     [suggestedResponses]
@@ -938,6 +973,21 @@ export default function TicketsPage() {
                   {!isLoadingSuggestions &&
                     !isGeneratingSuggestion &&
                     !suggestionError &&
+                    latestSuggestedResponse &&
+                    latestSuggestionConfidence &&
+                    latestSuggestionConfidence !== 'supported' && (
+                      <div
+                        className={`notice inline-notice confidence-notice ${latestSuggestionConfidence}`}
+                        role="status"
+                      >
+                        <AlertCircle size={16} aria-hidden="true" />
+                        {getSuggestionConfidenceMessage(latestSuggestionConfidence)}
+                      </div>
+                    )}
+
+                  {!isLoadingSuggestions &&
+                    !isGeneratingSuggestion &&
+                    !suggestionError &&
                     !latestSuggestedResponse && (
                       <div className="placeholder-item">
                         No suggested responses generated for this ticket yet.
@@ -954,7 +1004,9 @@ export default function TicketsPage() {
                     <div className="source-list">
                       {latestSuggestedResponse.sources.map((source, index) => (
                         <article
-                          className="source-item"
+                          className={`source-item ${
+                            isLowConfidenceSource(source) ? 'low-confidence' : ''
+                          }`}
                           key={source.chunk_id ?? `${source.document_name}-${index}`}
                         >
                           <div className="source-item-header">
@@ -972,7 +1024,11 @@ export default function TicketsPage() {
                                 </span>
                               </div>
                             </div>
-                            <span className="source-score">
+                            <span
+                              className={`source-score ${
+                                isLowConfidenceSource(source) ? 'low-confidence' : ''
+                              }`}
+                            >
                               {formatRelevanceScore(source.relevance_score)}
                             </span>
                           </div>
@@ -988,10 +1044,11 @@ export default function TicketsPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="placeholder-item source-empty-state">
-                      <BookOpen size={16} aria-hidden="true" />
-                      Sources will appear here when the suggested response retrieves matching
-                      document chunks.
+                    <div className="placeholder-item source-empty-state low-confidence">
+                      <AlertCircle size={16} aria-hidden="true" />
+                      {latestSuggestedResponse
+                        ? getSuggestionConfidenceMessage('none')
+                        : 'Sources will appear here when the suggested response retrieves matching document chunks.'}
                     </div>
                   )}
                 </section>
@@ -1082,7 +1139,9 @@ export default function TicketsPage() {
                             <div className="history-source-list">
                               {suggestion.sources.map((source, index) => (
                                 <div
-                                  className="history-source-item"
+                                  className={`history-source-item ${
+                                    isLowConfidenceSource(source) ? 'low-confidence' : ''
+                                  }`}
                                   key={source.chunk_id ?? `${source.document_name}-${index}`}
                                 >
                                   <strong>{source.document_name ?? 'Source document'}</strong>
