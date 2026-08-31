@@ -1,39 +1,36 @@
-# 🚀 Quick Start Guide
+# SupportOps Quickstart
 
-## Local Scaffold Setup
-
-### Requirements
+## Requirements
 
 - Docker & Docker Compose plugin (`docker compose`)
-- Node.js 18+
+- Node.js 22.13+
 - Python 3.11+
 - pnpm
 - uv
 
-### Go
+## Setup
 
 ```bash
-# Clone/enter directory
 cd supportops
-
-# Copy env config
 cp .env.example .env
-
-# Auto setup
 chmod +x scripts/setup.sh
 bash scripts/setup.sh
 ```
 
-Done! ✅
-
-## Running Services
+Run migrations after setup:
 
 ```bash
-npm run docker:up
+npm run db:migrate
+```
+
+## Run Locally
+
+```bash
 npm run dev
 ```
 
-This starts the local infrastructure first, then runs frontend, API, and workers in parallel.
+This starts the frontend, API, and workers in parallel. The script also ensures Docker
+infrastructure is running.
 
 Local URLs:
 
@@ -43,101 +40,207 @@ Local URLs:
 - pgAdmin: http://localhost:5050
 - MinIO console: http://localhost:9001
 
-### Optional: Run Services Separately
+Run services separately when debugging:
 
 ```bash
-npm run dev:web      # Frontend only
-npm run dev:api      # Backend API only
-npm run dev:workers  # Workers only
+npm run docker:up
+npm run dev:web
+npm run dev:api
+npm run dev:workers
 ```
 
-## Common Tasks
+## Manual MVP Test Flow
+
+Use this flow to validate the current Phase 1 MVP locally.
+
+### 1. Prepare Infrastructure
 
 ```bash
-# Stop everything
-npm run docker:down
-
-# View logs
-npm run docker:logs
-
-# Run tests
-npm run test
-
-# Format code
-npm run format
-
-# Using Make (easier)
-make help              # See all commands
-make docker-up         # Start infra
-make dev               # Start all services
-make lint              # Check code
-make test              # Run tests
+npm run docker:up
+npm run db:migrate
+npm run dev
 ```
 
-## Current Scaffold Endpoints
+Keep the terminal open. The API and workers must both be running for document processing.
 
-```
-GET / - Health/status endpoint
-```
+### 2. Upload a Knowledge Document
 
-Planned MVP endpoints are documented in `README.md` and will be added with the business/domain implementation.
+Open http://localhost:3000.
 
-## Project Structure
+Create a Markdown or text file with content related to support policy. Example:
 
-```
-supportops/
-├── apps/
-│   ├── web/          (Next.js frontend)
-│   ├── api/          (FastAPI backend)
-│   └── workers/      (Celery tasks)
-├── packages/         (Shared code - future)
-├── infra/            (Docker configs)
-├── scripts/          (Dev scripts)
-└── docs/             (Documentation)
+```markdown
+# Billing Refund Policy
+
+Duplicate invoice charges must be validated before promising a refund.
+
+Enterprise customers may require SLA review when billing incidents affect access or payment
+operations.
+
+Support agents should cite the billing playbook and confirm whether the duplicate charge was
+captured, settled, or already reversed.
 ```
 
-## Key Files
+Upload it in Knowledge Base:
 
-- **README.md** - Full documentation
-- **docs/ARCHITECTURE.md** - Hexagonal design explained
-- **docs/DESIGN.md** - Visual design system
-- **ROADMAP.md** - Implementation phases
+- Document type: `Internal policy` or `Playbook`
+- Product area: `Billing`
+- Tags: `enterprise, refund, invoice, billing`
+
+Expected result:
+
+- The document appears in the table.
+- Status moves from `Uploaded` or `Processing` to `Indexed`.
+- The detail panel shows `Ready for retrieval`.
+- `Chunks` is greater than `0`.
+
+### 3. Verify Chunks and Embeddings
+
+Open Postgres:
+
+```bash
+docker compose exec postgres psql -U supportops -d supportops
+```
+
+Run:
+
+```sql
+select name, status, chunk_count, failure_reason
+from documents
+order by created_at desc;
+
+select
+  document_id,
+  chunk_index,
+  embedding is not null as has_embedding
+from document_chunks
+order by document_id, chunk_index;
+```
+
+Expected result:
+
+- `documents.status` is `indexed`.
+- `failure_reason` is `null`.
+- `chunk_count` is greater than `0`.
+- `has_embedding` is `true`.
+
+### 4. Create a Ticket
+
+Open http://localhost:3000/tickets.
+
+Create this ticket:
+
+```text
+Ticket ID: TCK-2001
+Customer: Globex Corp
+Plan: Enterprise
+Category: Billing
+Priority: High
+Subject: Duplicate invoice charge refund request
+
+Description:
+The customer reports being charged twice for the same monthly invoice. They are asking whether
+the duplicate charge can be refunded immediately and if the issue affects their Enterprise SLA.
+```
+
+Expected result:
+
+- The ticket appears in the queue.
+- Selecting it opens the detail panel.
+- The detail panel shows `Ready for response drafting`.
+
+### 5. Generate a Suggested Response
+
+Click `Suggest response`.
+
+Expected result:
+
+- A suggested response appears.
+- The Sources section shows retrieved document chunks.
+- Each source shows document name, chunk number, excerpt, and match score.
+- If no source is found, the UI shows a low-confidence/no-source warning instead of a technical
+  error.
+
+### 6. Review the Suggestion
+
+Click `Approve` or `Reject`.
+
+Expected result:
+
+- The suggestion status changes to `Approved` or `Rejected`.
+- The review panel shows contextual feedback.
+- The latest suggestion remains visible.
+- Older suggestions appear in `Suggestion history` after more than one response is generated.
+
+### 7. Verify Suggested Responses in the Database
+
+```sql
+select id, ticket_id, status, sources
+from suggested_responses
+order by created_at desc
+limit 5;
+```
+
+Expected result:
+
+- `status` is `draft`, `approved`, or `rejected`.
+- `sources` contains source metadata when matching chunks were found.
+
+## Common Commands
+
+```bash
+npm run docker:up      # Start infrastructure
+npm run docker:down    # Stop infrastructure
+npm run docker:logs    # View infrastructure logs
+npm run db:migrate     # Apply database migrations
+npm run db:current     # Show current migration
+npm run dev            # Start web, API, and workers
+npm run dev:web        # Frontend only
+npm run dev:api        # API only
+npm run dev:workers    # Workers only
+npm run test           # Run test suites through Turbo
+```
 
 ## Troubleshooting
 
-**Docker won't start?**
+### Postgres Table Does Not Exist
+
+Run migrations:
 
 ```bash
-npm run docker:down
-npm run docker:up
+npm run db:migrate
 ```
 
-**Postgres connection error?**
+### Document Stays Uploaded
+
+Check that workers are running:
 
 ```bash
-docker ps              # Check containers running
-docker logs supportops-postgres  # See Postgres logs
+npm run dev:workers
 ```
 
-**uv lock issues?**
+Then click `Reprocess` in the document detail.
 
-```bash
-cd apps/api
-uv lock --upgrade
+### Chunks Have No Embeddings
+
+Reprocess documents created before embedding support was added:
+
+```text
+Knowledge Base -> select document -> Reprocess
 ```
 
-**Need a fresh local database volume?**
+### Need a Fresh Local Database
+
+This removes local database data:
 
 ```bash
 docker compose down -v
 npm run docker:up
+npm run db:migrate
 ```
 
-## What's Next?
+## Notes
 
-1. Read [ARCHITECTURE.md](docs/ARCHITECTURE.md) to understand hexagonal design
-2. Check [DESIGN.md](docs/DESIGN.md) for visual guidelines
-3. Explore [ROADMAP.md](ROADMAP.md) for implementation phases
-4. Start building! The current repo intentionally runs as a scaffold before database tables and business rules exist
-
-Good luck! 🎉
+The current MVP uses deterministic local embeddings and deterministic response drafts. It validates
+the full RAG workflow locally without requiring external AI API keys. Real embedding and LLM
+providers are planned for the next phase.
