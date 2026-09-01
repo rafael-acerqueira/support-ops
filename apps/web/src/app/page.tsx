@@ -5,6 +5,7 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  Cpu,
   Eye,
   FileText,
   History,
@@ -47,6 +48,18 @@ type KnowledgeDocument = {
   last_processed_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type DocumentChunk = {
+  id: string;
+  document_id: string;
+  chunk_index: number;
+  content: string;
+  metadata: Record<string, unknown>;
+  has_embedding: boolean;
+  embedding_provider: string | null;
+  embedding_model: string | null;
+  created_at: string;
 };
 
 const documentTypes: Array<{ value: DocumentType; label: string }> = [
@@ -163,6 +176,8 @@ export default function DocumentsPage() {
   const [busyDocumentId, setBusyDocumentId] = useState<string | null>(null);
   const [watchedDocumentIds, setWatchedDocumentIds] = useState<string[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [selectedDocumentChunks, setSelectedDocumentChunks] = useState<DocumentChunk[]>([]);
+  const [isLoadingChunks, setIsLoadingChunks] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -183,6 +198,17 @@ export default function DocumentsPage() {
     () => documents.find((document) => document.id === selectedDocumentId) ?? null,
     [documents, selectedDocumentId]
   );
+  const selectedEmbeddingSummary = useMemo(() => {
+    const embeddedChunks = selectedDocumentChunks.filter((chunk) => chunk.has_embedding);
+    const chunkWithMetadata =
+      embeddedChunks.find((chunk) => chunk.embedding_provider || chunk.embedding_model) ?? null;
+
+    return {
+      embeddedCount: embeddedChunks.length,
+      provider: chunkWithMetadata?.embedding_provider ?? null,
+      model: chunkWithMetadata?.embedding_model ?? null,
+    };
+  }, [selectedDocumentChunks]);
 
   const watchDocument = useCallback((documentId: string) => {
     setWatchedDocumentIds((current) =>
@@ -190,16 +216,42 @@ export default function DocumentsPage() {
     );
   }, []);
 
-  const selectDocument = useCallback((documentId: string) => {
-    setSelectedDocumentId(documentId);
+  const loadDocumentChunks = useCallback(async (documentId: string) => {
+    setIsLoadingChunks(true);
 
-    window.requestAnimationFrame(() => {
-      detailPanelRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-    });
+    try {
+      const response = await fetch(`/api/documents/${documentId}/chunks`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to load document chunks.');
+
+      const chunks = (await response.json()) as DocumentChunk[];
+      setSelectedDocumentChunks(chunks);
+    } catch (chunkError) {
+      setSelectedDocumentChunks([]);
+      setError(
+        chunkError instanceof Error
+          ? chunkError.message
+          : 'Unexpected error while loading document chunks.'
+      );
+    } finally {
+      setIsLoadingChunks(false);
+    }
   }, []);
+
+  const selectDocument = useCallback(
+    (documentId: string) => {
+      setSelectedDocumentId(documentId);
+      setSelectedDocumentChunks([]);
+      void loadDocumentChunks(documentId);
+
+      window.requestAnimationFrame(() => {
+        detailPanelRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      });
+    },
+    [loadDocumentChunks]
+  );
 
   const loadDocuments = useCallback(async (options?: { silent?: boolean }) => {
     if (!options?.silent) setError(null);
@@ -210,9 +262,12 @@ export default function DocumentsPage() {
 
       const nextDocuments = (await response.json()) as KnowledgeDocument[];
       setDocuments(nextDocuments);
-      setSelectedDocumentId((current) =>
-        current && nextDocuments.some((document) => document.id === current) ? current : null
-      );
+      setSelectedDocumentId((current) => {
+        if (!current || nextDocuments.some((document) => document.id === current)) return current;
+
+        setSelectedDocumentChunks([]);
+        return null;
+      });
       setWatchedDocumentIds((current) =>
         current.filter((documentId) => {
           const document = nextDocuments.find((item) => item.id === documentId);
@@ -313,6 +368,7 @@ export default function DocumentsPage() {
 
       if (action === 'process') {
         watchDocument(documentId);
+        setSelectedDocumentChunks([]);
         setDocuments((current) =>
           current.map((document) =>
             document.id === documentId ? { ...document, status: 'processing' } : document
@@ -628,7 +684,10 @@ export default function DocumentsPage() {
                   <button
                     className="icon-button small"
                     type="button"
-                    onClick={() => setSelectedDocumentId(null)}
+                    onClick={() => {
+                      setSelectedDocumentId(null);
+                      setSelectedDocumentChunks([]);
+                    }}
                     title="Close detail"
                   >
                     <X size={16} aria-hidden="true" />
@@ -760,6 +819,33 @@ export default function DocumentsPage() {
                       <span>No tags</span>
                     )}
                   </div>
+                </section>
+
+                <section className="detail-section" aria-labelledby="embedding-title">
+                  <div className="section-title-row">
+                    <div>
+                      <h3 id="embedding-title">Embedding</h3>
+                      <p>
+                        {isLoadingChunks
+                          ? 'Loading chunk metadata.'
+                          : `${selectedEmbeddingSummary.embeddedCount} of ${selectedDocumentChunks.length} chunks have vectors.`}
+                      </p>
+                    </div>
+                    <span className="icon-frame" aria-hidden="true">
+                      <Cpu size={18} />
+                    </span>
+                  </div>
+
+                  <dl className="embedding-grid">
+                    <div>
+                      <dt>Provider</dt>
+                      <dd>{selectedEmbeddingSummary.provider ?? '-'}</dd>
+                    </div>
+                    <div>
+                      <dt>Model</dt>
+                      <dd>{selectedEmbeddingSummary.model ?? '-'}</dd>
+                    </div>
+                  </dl>
                 </section>
 
                 <section className="detail-section" aria-labelledby="versions-title">

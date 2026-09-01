@@ -10,6 +10,7 @@ from supportops_api.application.documents import (
     DocumentNotFoundError,
     GeneratedEmbedding,
     GetDocument,
+    ListDocumentChunks,
     ListDocuments,
     ProcessDocument,
 )
@@ -40,6 +41,9 @@ class InMemoryDocumentRepository:
 
     async def list_all(self) -> list[Document]:
         return list(self.documents.values())
+
+    async def list_chunks(self, document_id: UUID) -> list[DocumentChunk]:
+        return self.chunks.get(document_id, [])
 
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
         self.chunks[document_id] = chunks
@@ -126,6 +130,19 @@ async def test_get_document_raises_when_document_does_not_exist() -> None:
         await GetDocument(repository).execute(document_id)
 
     assert error.value.document_id == document_id
+
+
+@pytest.mark.asyncio
+async def test_list_document_chunks_returns_document_chunks() -> None:
+    repository = InMemoryDocumentRepository()
+    document = create_uploaded_document()
+    chunks = [DocumentChunk(document_id=document.id, chunk_index=0, content="Refund policy")]
+    await repository.add(document)
+    await repository.replace_chunks(document.id, chunks)
+
+    listed_chunks = await ListDocumentChunks(repository).execute(document.id)
+
+    assert listed_chunks == chunks
 
 
 @pytest.mark.asyncio

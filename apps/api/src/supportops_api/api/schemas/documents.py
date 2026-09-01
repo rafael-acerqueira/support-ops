@@ -5,7 +5,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from supportops_api.domain.documents import Document, DocumentStatus, DocumentType, ProductArea
+from supportops_api.domain.documents import (
+    Document,
+    DocumentChunk,
+    DocumentStatus,
+    DocumentType,
+    ProductArea,
+)
 
 
 class CreateDocumentRequest(BaseModel):
@@ -57,6 +63,32 @@ class DocumentResponse(BaseModel):
             last_processed_at=document.last_processed_at,
             created_at=document.created_at,
             updated_at=document.updated_at,
+        )
+
+
+class DocumentChunkResponse(BaseModel):
+    id: UUID
+    document_id: UUID
+    chunk_index: int
+    content: str
+    metadata: dict
+    has_embedding: bool
+    embedding_provider: str | None
+    embedding_model: str | None
+    created_at: datetime
+
+    @classmethod
+    def from_domain(cls, chunk: DocumentChunk) -> DocumentChunkResponse:
+        return cls(
+            id=chunk.id,
+            document_id=chunk.document_id,
+            chunk_index=chunk.chunk_index,
+            content=chunk.content,
+            metadata=chunk.metadata,
+            has_embedding=chunk.embedding is not None,
+            embedding_provider=chunk.embedding_provider,
+            embedding_model=chunk.embedding_model,
+            created_at=chunk.created_at,
         )
 
 

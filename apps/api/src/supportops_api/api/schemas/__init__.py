@@ -1,5 +1,6 @@
 from supportops_api.api.schemas.documents import (
     CreateDocumentRequest,
+    DocumentChunkResponse,
     DocumentProcessingResponse,
     DocumentResponse,
 )
@@ -14,6 +15,7 @@ from supportops_api.api.schemas.tickets import (
 __all__ = [
     "CreateDocumentRequest",
     "CreateTicketRequest",
+    "DocumentChunkResponse",
     "DocumentProcessingResponse",
     "DocumentResponse",
     "SuggestedResponseResponse",

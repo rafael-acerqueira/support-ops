@@ -12,6 +12,7 @@ from supportops_api.api.dependencies import (
 )
 from supportops_api.api.schemas import (
     CreateDocumentRequest,
+    DocumentChunkResponse,
     DocumentProcessingResponse,
     DocumentResponse,
 )
@@ -25,6 +26,7 @@ from supportops_api.application.documents import (
     DocumentRepository,
     DocumentStorage,
     GetDocument,
+    ListDocumentChunks,
     ListDocuments,
 )
 from supportops_api.domain.documents import DocumentType, ProductArea
@@ -133,6 +135,19 @@ async def get_document(
         raise _not_found_error(error) from error
 
     return DocumentResponse.from_domain(document)
+
+
+@router.get("/{document_id}/chunks", response_model=list[DocumentChunkResponse])
+async def list_document_chunks(
+    document_id: UUID,
+    repository: DocumentRepository = Depends(get_document_repository),
+) -> list[DocumentChunkResponse]:
+    try:
+        chunks = await ListDocumentChunks(repository).execute(document_id)
+    except DocumentNotFoundError as error:
+        raise _not_found_error(error) from error
+
+    return [DocumentChunkResponse.from_domain(chunk) for chunk in chunks]
 
 
 @router.post("/{document_id}/activate", response_model=DocumentResponse)
