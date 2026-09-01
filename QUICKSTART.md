@@ -112,7 +112,9 @@ order by created_at desc;
 select
   document_id,
   chunk_index,
-  embedding is not null as has_embedding
+  embedding is not null as has_embedding,
+  embedding_provider,
+  embedding_model
 from document_chunks
 order by document_id, chunk_index;
 ```
@@ -123,6 +125,8 @@ Expected result:
 - `failure_reason` is `null`.
 - `chunk_count` is greater than `0`.
 - `has_embedding` is `true`.
+- `embedding_provider` matches the configured provider.
+- `embedding_model` matches the configured model.
 
 ### 4. Create a Ticket
 
@@ -241,6 +245,8 @@ npm run db:migrate
 
 ## Notes
 
-The current MVP uses deterministic local embeddings and deterministic response drafts. It validates
-the full RAG workflow locally without requiring external AI API keys. Real embedding and LLM
-providers are planned for the next phase.
+The default local setup uses deterministic embeddings and deterministic response drafts. It validates
+the full RAG workflow locally without requiring external AI API keys.
+
+To use OpenAI embeddings, set `EMBEDDING_PROVIDER=openai`, define `OPENAI_API_KEY`, and keep or update
+`OPENAI_EMBEDDING_MODEL`.

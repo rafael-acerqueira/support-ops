@@ -118,9 +118,13 @@ def test_document_chunk_preserves_embedding_values() -> None:
         chunk_index=1,
         content="SLA response window",
         embedding=(0.1, -0.2),
+        embedding_provider=" OpenAI ",
+        embedding_model=" text-embedding-3-small ",
     )
 
     assert chunk.embedding == (0.1, -0.2)
+    assert chunk.embedding_provider == "openai"
+    assert chunk.embedding_model == "text-embedding-3-small"
 
 
 def test_document_chunk_rejects_empty_embedding() -> None:
@@ -130,4 +134,24 @@ def test_document_chunk_rejects_empty_embedding() -> None:
             chunk_index=1,
             content="SLA response window",
             embedding=(),
+        )
+
+
+def test_document_chunk_rejects_empty_embedding_provider() -> None:
+    with pytest.raises(ValueError, match="embedding provider"):
+        DocumentChunk(
+            document_id=uuid4(),
+            chunk_index=1,
+            content="SLA response window",
+            embedding_provider="   ",
+        )
+
+
+def test_document_chunk_rejects_empty_embedding_model() -> None:
+    with pytest.raises(ValueError, match="embedding model"):
+        DocumentChunk(
+            document_id=uuid4(),
+            chunk_index=1,
+            content="SLA response window",
+            embedding_model="   ",
         )

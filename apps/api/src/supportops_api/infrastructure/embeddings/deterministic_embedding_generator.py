@@ -28,6 +28,7 @@ class DeterministicEmbeddingGenerator(EmbeddingGenerator):
                 _hash_to_unit_value(normalized_text, index) for index in range(self._dimensions)
             ),
             model=self._model,
+            provider="deterministic",
         )
 
 

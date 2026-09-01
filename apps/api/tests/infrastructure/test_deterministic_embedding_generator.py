@@ -8,6 +8,7 @@ async def test_deterministic_embedding_generator_returns_expected_dimensions() -
     embedding = await DeterministicEmbeddingGenerator(dimensions=8).generate("Refund policy")
 
     assert embedding.model == "supportops-deterministic-v1"
+    assert embedding.provider == "deterministic"
     assert embedding.dimensions == 8
     assert len(embedding.values) == 8
     assert all(-1 <= value <= 1 for value in embedding.values)

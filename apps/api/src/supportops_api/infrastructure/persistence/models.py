@@ -136,6 +136,8 @@ class DocumentChunkRecord(Base):
         "metadata", JSONB, nullable=False, default=dict
     )
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
+    embedding_provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

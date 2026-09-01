@@ -47,6 +47,14 @@ class PostgresDocumentRepository(DocumentRepository):
         )
         return [_record_to_document(record) for record in result.scalars()]
 
+    async def list_chunks(self, document_id: UUID) -> list[DocumentChunk]:
+        result = await self._session.execute(
+            select(DocumentChunkRecord)
+            .where(DocumentChunkRecord.document_id == document_id)
+            .order_by(DocumentChunkRecord.chunk_index.asc())
+        )
+        return [_record_to_chunk(record) for record in result.scalars()]
+
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
         if any(chunk.document_id != document_id for chunk in chunks):
             raise ValueError("All chunks must belong to the document being replaced")
@@ -129,6 +137,8 @@ def _chunk_to_record(chunk: DocumentChunk) -> DocumentChunkRecord:
         content=chunk.content,
         chunk_metadata=chunk.metadata,
         embedding=list(chunk.embedding) if chunk.embedding is not None else None,
+        embedding_provider=chunk.embedding_provider,
+        embedding_model=chunk.embedding_model,
         created_at=chunk.created_at,
     )
 
@@ -141,6 +151,8 @@ def _record_to_chunk(record: DocumentChunkRecord) -> DocumentChunk:
         content=record.content,
         metadata=record.chunk_metadata,
         embedding=_embedding_to_tuple(record.embedding),
+        embedding_provider=record.embedding_provider,
+        embedding_model=record.embedding_model,
         created_at=record.created_at,
     )
 

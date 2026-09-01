@@ -18,6 +18,10 @@ class DocumentNotFoundError(Exception):
         self.document_id = document_id
 
 
+class EmbeddingProviderError(Exception):
+    pass
+
+
 class DocumentRepository(Protocol):
     async def add(self, document: Document) -> None:
         pass
@@ -29,6 +33,9 @@ class DocumentRepository(Protocol):
         pass
 
     async def list_all(self) -> list[Document]:
+        pass
+
+    async def list_chunks(self, document_id: UUID) -> list[DocumentChunk]:
         pass
 
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
@@ -44,6 +51,7 @@ class DocumentProcessor(Protocol):
 class GeneratedEmbedding:
     values: tuple[float, ...]
     model: str
+    provider: str = "unknown"
 
     @property
     def dimensions(self) -> int:
@@ -140,6 +148,18 @@ class GetDocument:
         return document
 
 
+class ListDocumentChunks:
+    def __init__(self, repository: DocumentRepository) -> None:
+        self._repository = repository
+
+    async def execute(self, document_id: UUID) -> list[DocumentChunk]:
+        document = await self._repository.get(document_id)
+        if document is None:
+            raise DocumentNotFoundError(document_id)
+
+        return await self._repository.list_chunks(document_id)
+
+
 class ActivateDocument:
     def __init__(self, repository: DocumentRepository) -> None:
         self._repository = repository
@@ -215,6 +235,8 @@ class ProcessDocument:
                     content=chunk.content,
                     metadata=chunk.metadata,
                     embedding=embedding.values,
+                    embedding_provider=embedding.provider,
+                    embedding_model=embedding.model,
                     created_at=chunk.created_at,
                 )
             )
