@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from src.celery_app import celery_app
 from supportops_api.application.documents import ProcessDocument
 from supportops_api.infrastructure.database import get_database_url
-from supportops_api.infrastructure.embeddings import DeterministicEmbeddingGenerator
+from supportops_api.infrastructure.embeddings import get_embedding_generator_from_env
 from supportops_api.infrastructure.persistence import PostgresDocumentRepository
 from supportops_api.infrastructure.processing import BasicDocumentProcessor
 from supportops_api.infrastructure.storage import get_local_document_storage
@@ -27,7 +27,7 @@ async def _process_document(document_id: UUID) -> dict[str, str]:
         async with session_factory() as session:
             repository = PostgresDocumentRepository(session)
             processor = BasicDocumentProcessor(get_local_document_storage())
-            embedding_generator = DeterministicEmbeddingGenerator()
+            embedding_generator = get_embedding_generator_from_env()
             document = await ProcessDocument(
                 repository,
                 processor,

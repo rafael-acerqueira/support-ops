@@ -18,7 +18,7 @@ from supportops_api.application.response_suggestions import (
 )
 from supportops_api.application.tickets import TicketRepository
 from supportops_api.infrastructure.database import get_session
-from supportops_api.infrastructure.embeddings import DeterministicEmbeddingGenerator
+from supportops_api.infrastructure.embeddings import get_embedding_generator_from_env
 from supportops_api.infrastructure.persistence import (
     PostgresDocumentChunkRepository,
     PostgresDocumentRepository,
@@ -51,7 +51,7 @@ def get_document_processor(
 
 
 def get_embedding_generator() -> EmbeddingGenerator:
-    return DeterministicEmbeddingGenerator()
+    return get_embedding_generator_from_env()
 
 
 def get_document_processing_queue(

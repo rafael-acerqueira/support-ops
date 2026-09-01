@@ -241,6 +241,8 @@ npm run db:migrate
 
 ## Notes
 
-The current MVP uses deterministic local embeddings and deterministic response drafts. It validates
-the full RAG workflow locally without requiring external AI API keys. Real embedding and LLM
-providers are planned for the next phase.
+The default local setup uses deterministic embeddings and deterministic response drafts. It validates
+the full RAG workflow locally without requiring external AI API keys.
+
+To use OpenAI embeddings, set `EMBEDDING_PROVIDER=openai`, define `OPENAI_API_KEY`, and keep or update
+`OPENAI_EMBEDDING_MODEL`.
