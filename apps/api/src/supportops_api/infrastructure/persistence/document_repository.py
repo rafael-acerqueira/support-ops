@@ -129,6 +129,8 @@ def _chunk_to_record(chunk: DocumentChunk) -> DocumentChunkRecord:
         content=chunk.content,
         chunk_metadata=chunk.metadata,
         embedding=list(chunk.embedding) if chunk.embedding is not None else None,
+        embedding_provider=chunk.embedding_provider,
+        embedding_model=chunk.embedding_model,
         created_at=chunk.created_at,
     )
 
@@ -141,6 +143,8 @@ def _record_to_chunk(record: DocumentChunkRecord) -> DocumentChunk:
         content=record.content,
         metadata=record.chunk_metadata,
         embedding=_embedding_to_tuple(record.embedding),
+        embedding_provider=record.embedding_provider,
+        embedding_model=record.embedding_model,
         created_at=record.created_at,
     )
 

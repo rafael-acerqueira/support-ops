@@ -33,6 +33,7 @@ async def test_openai_embedding_generator_returns_embedding() -> None:
     embedding = await generator.generate("  Refund   policy  ")
 
     assert embedding.model == "text-embedding-3-small"
+    assert embedding.provider == "openai"
     assert embedding.values == (0.1, -0.2, 0.3)
     assert embedding.dimensions == 3
     assert client.embeddings.requests == [

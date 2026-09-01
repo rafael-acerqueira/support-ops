@@ -71,6 +71,8 @@ def test_chunk_record_roundtrip_preserves_domain_values() -> None:
         content="Enterprise refunds require approval.",
         metadata={"section": "Refund policy"},
         embedding=(0.1, -0.2, 0.3),
+        embedding_provider="openai",
+        embedding_model="text-embedding-3-small",
     )
 
     record = _chunk_to_record(chunk)
@@ -82,6 +84,8 @@ def test_chunk_record_roundtrip_preserves_domain_values() -> None:
     assert mapped_chunk.content == "Enterprise refunds require approval."
     assert mapped_chunk.metadata == {"section": "Refund policy"}
     assert mapped_chunk.embedding == (0.1, -0.2, 0.3)
+    assert mapped_chunk.embedding_provider == "openai"
+    assert mapped_chunk.embedding_model == "text-embedding-3-small"
 
 
 def test_vector_type_converts_python_values_to_pgvector_text() -> None:
@@ -124,12 +128,16 @@ async def test_postgres_document_repository_persists_document_workflow() -> None
             chunk_index=0,
             content="First chunk",
             embedding=create_test_embedding(0.1),
+            embedding_provider="deterministic",
+            embedding_model="supportops-deterministic-v1",
         ),
         DocumentChunk(
             document_id=document.id,
             chunk_index=1,
             content="Second chunk",
             embedding=create_test_embedding(0.2),
+            embedding_provider="deterministic",
+            embedding_model="supportops-deterministic-v1",
         ),
     ]
 

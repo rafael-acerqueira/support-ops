@@ -26,4 +26,4 @@ class OpenAIEmbeddingGenerator(EmbeddingGenerator):
         )
         values = tuple(float(value) for value in response.data[0].embedding)
 
-        return GeneratedEmbedding(values=values, model=self._model)
+        return GeneratedEmbedding(values=values, model=self._model, provider="openai")

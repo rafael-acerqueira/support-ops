@@ -44,6 +44,7 @@ class DocumentProcessor(Protocol):
 class GeneratedEmbedding:
     values: tuple[float, ...]
     model: str
+    provider: str = "unknown"
 
     @property
     def dimensions(self) -> int:
@@ -215,6 +216,8 @@ class ProcessDocument:
                     content=chunk.content,
                     metadata=chunk.metadata,
                     embedding=embedding.values,
+                    embedding_provider=embedding.provider,
+                    embedding_model=embedding.model,
                     created_at=chunk.created_at,
                 )
             )

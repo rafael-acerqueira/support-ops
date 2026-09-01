@@ -112,7 +112,9 @@ order by created_at desc;
 select
   document_id,
   chunk_index,
-  embedding is not null as has_embedding
+  embedding is not null as has_embedding,
+  embedding_provider,
+  embedding_model
 from document_chunks
 order by document_id, chunk_index;
 ```
@@ -123,6 +125,8 @@ Expected result:
 - `failure_reason` is `null`.
 - `chunk_count` is greater than `0`.
 - `has_embedding` is `true`.
+- `embedding_provider` matches the configured provider.
+- `embedding_model` matches the configured model.
 
 ### 4. Create a Ticket
 

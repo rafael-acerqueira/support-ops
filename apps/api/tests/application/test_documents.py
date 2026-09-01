@@ -68,7 +68,7 @@ class FailingDocumentProcessor:
 
 class FakeEmbeddingGenerator:
     async def generate(self, text: str) -> GeneratedEmbedding:
-        return GeneratedEmbedding(values=(float(len(text)),), model="fake")
+        return GeneratedEmbedding(values=(float(len(text)),), model="fake-model", provider="fake")
 
 
 def create_uploaded_document() -> Document:
@@ -170,7 +170,11 @@ async def test_process_document_generates_chunk_embeddings_when_generator_is_pro
 
     chunks = repository.chunks[document.id]
     assert chunks[0].embedding == (38.0,)
+    assert chunks[0].embedding_provider == "fake"
+    assert chunks[0].embedding_model == "fake-model"
     assert chunks[1].embedding == (36.0,)
+    assert chunks[1].embedding_provider == "fake"
+    assert chunks[1].embedding_model == "fake-model"
 
 
 @pytest.mark.asyncio

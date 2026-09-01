@@ -157,12 +157,18 @@ class DocumentChunk:
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
     embedding: tuple[float, ...] | None = None
+    embedding_provider: str | None = None
+    embedding_model: str | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=_utcnow)
 
     def __post_init__(self) -> None:
         content = self.content.strip()
         embedding = tuple(float(value) for value in self.embedding) if self.embedding else None
+        embedding_provider = (
+            self.embedding_provider.strip().lower() if self.embedding_provider is not None else None
+        )
+        embedding_model = self.embedding_model.strip() if self.embedding_model is not None else None
 
         if self.chunk_index < 0:
             raise ValueError("Chunk index cannot be negative")
@@ -170,6 +176,12 @@ class DocumentChunk:
             raise ValueError("Chunk content is required")
         if self.embedding is not None and embedding is None:
             raise ValueError("Chunk embedding cannot be empty")
+        if self.embedding_provider is not None and not embedding_provider:
+            raise ValueError("Chunk embedding provider cannot be empty")
+        if self.embedding_model is not None and not embedding_model:
+            raise ValueError("Chunk embedding model cannot be empty")
 
         object.__setattr__(self, "content", content)
         object.__setattr__(self, "embedding", embedding)
+        object.__setattr__(self, "embedding_provider", embedding_provider)
+        object.__setattr__(self, "embedding_model", embedding_model)
