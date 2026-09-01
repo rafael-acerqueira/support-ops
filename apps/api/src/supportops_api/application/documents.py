@@ -18,6 +18,10 @@ class DocumentNotFoundError(Exception):
         self.document_id = document_id
 
 
+class EmbeddingProviderError(Exception):
+    pass
+
+
 class DocumentRepository(Protocol):
     async def add(self, document: Document) -> None:
         pass

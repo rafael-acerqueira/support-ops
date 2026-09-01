@@ -28,6 +28,11 @@ def test_create_embedding_generator_returns_openai_provider() -> None:
     assert isinstance(generator, OpenAIEmbeddingGenerator)
 
 
+def test_create_embedding_generator_rejects_blank_openai_model() -> None:
+    with pytest.raises(ValueError, match="OPENAI_EMBEDDING_MODEL"):
+        create_embedding_generator("openai", openai_model="   ", openai_client=FakeOpenAIClient())
+
+
 def test_create_embedding_generator_rejects_unknown_provider() -> None:
     with pytest.raises(ValueError, match="Unsupported embedding provider"):
         create_embedding_generator("unknown")

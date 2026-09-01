@@ -75,6 +75,11 @@ class FakeEmbeddingGenerator:
         return GeneratedEmbedding(values=(float(len(text)),), model="fake-model", provider="fake")
 
 
+class FailingEmbeddingGenerator:
+    async def generate(self, text: str) -> GeneratedEmbedding:
+        raise RuntimeError("Embedding provider failed")
+
+
 def create_uploaded_document() -> Document:
     return Document.create(
         name="Refund Policy",
@@ -192,6 +197,24 @@ async def test_process_document_generates_chunk_embeddings_when_generator_is_pro
     assert chunks[1].embedding == (36.0,)
     assert chunks[1].embedding_provider == "fake"
     assert chunks[1].embedding_model == "fake-model"
+
+
+@pytest.mark.asyncio
+async def test_process_document_marks_failed_when_embedding_generation_fails() -> None:
+    repository = InMemoryDocumentRepository()
+    document = create_uploaded_document()
+    await repository.add(document)
+
+    with pytest.raises(RuntimeError, match="Embedding provider failed"):
+        await ProcessDocument(
+            repository,
+            SuccessfulDocumentProcessor(),
+            FailingEmbeddingGenerator(),
+        ).execute(document.id)
+
+    assert document.status == DocumentStatus.FAILED
+    assert document.failure_reason == "Embedding provider failed"
+    assert repository.chunks.get(document.id) is None
 
 
 @pytest.mark.asyncio

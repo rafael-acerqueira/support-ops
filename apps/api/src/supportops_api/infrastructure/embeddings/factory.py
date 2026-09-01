@@ -22,12 +22,16 @@ def create_embedding_generator(
     openai_client: Any | None = None,
 ) -> EmbeddingGenerator:
     normalized_provider = provider.strip().lower()
+    normalized_openai_model = openai_model.strip()
 
     if normalized_provider == "deterministic":
         return DeterministicEmbeddingGenerator()
 
     if normalized_provider == "openai":
-        return OpenAIEmbeddingGenerator(model=openai_model, client=openai_client)
+        if not normalized_openai_model:
+            raise ValueError("OPENAI_EMBEDDING_MODEL is required when EMBEDDING_PROVIDER=openai")
+
+        return OpenAIEmbeddingGenerator(model=normalized_openai_model, client=openai_client)
 
     raise ValueError(f"Unsupported embedding provider: {provider}")
 
