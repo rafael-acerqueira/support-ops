@@ -154,7 +154,7 @@ async def test_basic_ticket_knowledge_retriever_filters_low_relevance_vector_sou
         chunk_id=UUID("68d366c3-ce83-42d0-887b-de85eb55747c"),
         chunk_index=0,
         content="Enterprise customers receive a four hour response SLA.",
-        relevance_score=0.48,
+        relevance_score=0.32,
     )
     repository = InMemoryKnowledgeSourceRepository(
         candidates=[],
@@ -164,7 +164,7 @@ async def test_basic_ticket_knowledge_retriever_filters_low_relevance_vector_sou
     sources = await BasicTicketKnowledgeRetriever(
         repository,
         FakeEmbeddingGenerator(),
-        min_relevance_score=0.7,
+        min_relevance_score=0.45,
     ).retrieve(create_ticket(), limit=3)
 
     assert sources == [relevant_source]
@@ -185,7 +185,7 @@ async def test_basic_ticket_knowledge_retriever_filters_low_relevance_keyword_so
 
     sources = await BasicTicketKnowledgeRetriever(
         repository,
-        min_relevance_score=0.7,
+        min_relevance_score=0.45,
     ).retrieve(create_ticket(), limit=3)
 
     assert sources == []

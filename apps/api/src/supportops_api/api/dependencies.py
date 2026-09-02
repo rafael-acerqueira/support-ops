@@ -87,7 +87,7 @@ def get_ticket_knowledge_retriever(
     return BasicTicketKnowledgeRetriever(
         repository,
         embedding_generator,
-        min_relevance_score=_get_float_env("KNOWLEDGE_MIN_RELEVANCE_SCORE", 0.7),
+        min_relevance_score=_get_float_env("KNOWLEDGE_MIN_RELEVANCE_SCORE", 0.45),
     )
 
 

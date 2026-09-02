@@ -19,7 +19,7 @@ class BasicTicketKnowledgeRetriever(TicketKnowledgeRetriever):
         embedding_generator: EmbeddingGenerator | None = None,
         *,
         candidate_limit: int = 50,
-        min_relevance_score: float = 0.7,
+        min_relevance_score: float = 0.45,
     ) -> None:
         if not 0 <= min_relevance_score <= 1:
             raise ValueError("min_relevance_score must be between 0 and 1")
