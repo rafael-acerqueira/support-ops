@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,8 +31,8 @@ from supportops_api.infrastructure.processing import BasicDocumentProcessor
 from supportops_api.infrastructure.queues import CeleryDocumentProcessingQueue
 from supportops_api.infrastructure.storage import get_local_document_storage
 from supportops_api.infrastructure.suggestions import (
-    BasicResponseSuggestionGenerator,
     BasicTicketKnowledgeRetriever,
+    get_response_suggestion_generator_from_env,
 )
 
 
@@ -82,10 +84,25 @@ def get_ticket_knowledge_retriever(
     repository: KnowledgeSourceRepository = Depends(get_knowledge_source_repository),
     embedding_generator: EmbeddingGenerator = Depends(get_embedding_generator),
 ) -> TicketKnowledgeRetriever:
-    return BasicTicketKnowledgeRetriever(repository, embedding_generator)
+    return BasicTicketKnowledgeRetriever(
+        repository,
+        embedding_generator,
+        min_relevance_score=_get_float_env("KNOWLEDGE_MIN_RELEVANCE_SCORE", 0.7),
+    )
 
 
 def get_response_suggestion_generator(
     knowledge_retriever: TicketKnowledgeRetriever = Depends(get_ticket_knowledge_retriever),
 ) -> ResponseSuggestionGenerator:
-    return BasicResponseSuggestionGenerator(knowledge_retriever)
+    return get_response_suggestion_generator_from_env(knowledge_retriever)
+
+
+def _get_float_env(name: str, default: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+
+    try:
+        return float(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a valid number") from exc

@@ -24,6 +24,7 @@ from supportops_api.application.response_suggestions import (
     KnowledgeSourceRepository,
     ResponseSuggestionGenerator,
     ResponseSuggestionRepository,
+    ResponseGenerationProviderError,
     RetrievedKnowledgeSource,
     TicketKnowledgeRetriever,
 )
@@ -67,6 +68,7 @@ __all__ = [
     "ProcessDocument",
     "ResponseSuggestionGenerator",
     "ResponseSuggestionRepository",
+    "ResponseGenerationProviderError",
     "RetrievedKnowledgeSource",
     "StoredDocumentFile",
     "TicketKnowledgeRetriever",
