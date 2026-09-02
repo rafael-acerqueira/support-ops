@@ -19,16 +19,26 @@ class BasicTicketKnowledgeRetriever(TicketKnowledgeRetriever):
         embedding_generator: EmbeddingGenerator | None = None,
         *,
         candidate_limit: int = 50,
+        min_relevance_score: float = 0.7,
     ) -> None:
+        if not 0 <= min_relevance_score <= 1:
+            raise ValueError("min_relevance_score must be between 0 and 1")
+
         self._repository = repository
         self._embedding_generator = embedding_generator
         self._candidate_limit = candidate_limit
+        self._min_relevance_score = min_relevance_score
 
     async def retrieve(self, ticket: Ticket, *, limit: int = 3) -> list[RetrievedKnowledgeSource]:
         if self._embedding_generator is not None:
             embedding = await self._embedding_generator.generate(_ticket_to_embedding_text(ticket))
-            return await self._repository.search_similar_chunks(
+            sources = await self._repository.search_similar_chunks(
                 embedding=embedding.values,
+                limit=max(limit, self._candidate_limit),
+            )
+            return _filter_relevant_sources(
+                sources,
+                min_relevance_score=self._min_relevance_score,
                 limit=limit,
             )
 
@@ -47,7 +57,20 @@ class BasicTicketKnowledgeRetriever(TicketKnowledgeRetriever):
         ]
         ranked_sources.sort(key=lambda source: source.relevance_score, reverse=True)
 
-        return [source for source in ranked_sources if source.relevance_score > 0][:limit]
+        return _filter_relevant_sources(
+            ranked_sources,
+            min_relevance_score=self._min_relevance_score,
+            limit=limit,
+        )
+
+
+def _filter_relevant_sources(
+    sources: list[RetrievedKnowledgeSource],
+    *,
+    min_relevance_score: float,
+    limit: int,
+) -> list[RetrievedKnowledgeSource]:
+    return [source for source in sources if source.relevance_score >= min_relevance_score][:limit]
 
 
 def _ticket_to_embedding_text(ticket: Ticket) -> str:

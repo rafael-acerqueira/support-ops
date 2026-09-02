@@ -130,7 +130,69 @@ async def test_basic_ticket_knowledge_retriever_uses_vector_search_when_generato
 
     assert sources == [expected_source]
     assert repository.search_embedding == (0.1, 0.2, 0.3)
-    assert repository.search_limit == 1
+    assert repository.search_limit == 50
     assert repository.limit is None
     assert embedding_generator.text is not None
     assert "Duplicate invoice refund request" in embedding_generator.text
+
+
+@pytest.mark.asyncio
+async def test_basic_ticket_knowledge_retriever_filters_low_relevance_vector_sources() -> None:
+    relevant_source = RetrievedKnowledgeSource(
+        document_id=UUID("ef9d4205-6c22-481c-b8a7-f4b6d7a7aca6"),
+        document_name="refund-policy.md",
+        document_type="internal_policy",
+        chunk_id=UUID("fb27fd5f-3813-4977-97b5-e129439f7f6c"),
+        chunk_index=0,
+        content="Validate duplicate invoice charges before promising a refund.",
+        relevance_score=0.82,
+    )
+    weak_source = RetrievedKnowledgeSource(
+        document_id=UUID("53585070-2a9b-4a59-b78e-e97daef49f1a"),
+        document_name="enterprise-sla.md",
+        document_type="sla_policy",
+        chunk_id=UUID("68d366c3-ce83-42d0-887b-de85eb55747c"),
+        chunk_index=0,
+        content="Enterprise customers receive a four hour response SLA.",
+        relevance_score=0.48,
+    )
+    repository = InMemoryKnowledgeSourceRepository(
+        candidates=[],
+        sources=[relevant_source, weak_source],
+    )
+
+    sources = await BasicTicketKnowledgeRetriever(
+        repository,
+        FakeEmbeddingGenerator(),
+        min_relevance_score=0.7,
+    ).retrieve(create_ticket(), limit=3)
+
+    assert sources == [relevant_source]
+
+
+@pytest.mark.asyncio
+async def test_basic_ticket_knowledge_retriever_filters_low_relevance_keyword_sources() -> None:
+    repository = InMemoryKnowledgeSourceRepository(
+        [
+            create_candidate(
+                document_id="53585070-2a9b-4a59-b78e-e97daef49f1a",
+                document_name="enterprise-sla.md",
+                product_area="support",
+                content="Enterprise customers receive a four hour response SLA.",
+            )
+        ]
+    )
+
+    sources = await BasicTicketKnowledgeRetriever(
+        repository,
+        min_relevance_score=0.7,
+    ).retrieve(create_ticket(), limit=3)
+
+    assert sources == []
+
+
+def test_basic_ticket_knowledge_retriever_rejects_invalid_threshold() -> None:
+    repository = InMemoryKnowledgeSourceRepository([])
+
+    with pytest.raises(ValueError, match="min_relevance_score"):
+        BasicTicketKnowledgeRetriever(repository, min_relevance_score=1.1)
