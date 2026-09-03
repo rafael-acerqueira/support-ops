@@ -51,6 +51,7 @@ type SuggestedResponse = {
   sources: SuggestedResponseSource[];
   confidence_score: number | null;
   confidence_level: SuggestionConfidenceLevel;
+  confidence_reason: string;
   created_at: string;
   updated_at: string;
 };
@@ -1088,6 +1089,9 @@ export default function TicketsPage() {
                           </div>
                           <span>{formatDate(latestSuggestedResponse.created_at)}</span>
                         </div>
+                        <small className="suggestion-confidence-reason">
+                          {latestSuggestedResponse.confidence_reason}
+                        </small>
                         <p>{latestSuggestedResponse.content}</p>
                       </article>
                     )}
@@ -1273,6 +1277,9 @@ export default function TicketsPage() {
                             </div>
                             <span>{formatDate(suggestion.created_at)}</span>
                           </div>
+                          <small className="suggestion-confidence-reason compact">
+                            {suggestion.confidence_reason}
+                          </small>
                           <p>{suggestion.content}</p>
                           {suggestion.sources.length ? (
                             <div className="history-source-list">
