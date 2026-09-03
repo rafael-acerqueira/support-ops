@@ -15,6 +15,10 @@ class SuggestedResponseNotFoundError(Exception):
         self.suggestion_id = suggestion_id
 
 
+class ResponseGenerationProviderError(Exception):
+    pass
+
+
 class ResponseSuggestionRepository(Protocol):
     async def add(self, suggestion: SuggestedResponse) -> None:
         pass

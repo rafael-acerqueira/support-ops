@@ -249,4 +249,7 @@ The default local setup uses deterministic embeddings and deterministic response
 the full RAG workflow locally without requiring external AI API keys.
 
 To use OpenAI embeddings, set `EMBEDDING_PROVIDER=openai`, define `OPENAI_API_KEY`, and keep or update
-`OPENAI_EMBEDDING_MODEL`.
+`OPENAI_EMBEDDING_MODEL`. To use OpenAI suggested responses, set
+`RESPONSE_GENERATOR_PROVIDER=openai` and keep or update `OPENAI_MODEL`.
+Use `KNOWLEDGE_MIN_RELEVANCE_SCORE` to filter weak retrieved sources before drafting responses.
+If suggestions return no sources, lower it temporarily and inspect the retrieved source scores.
