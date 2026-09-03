@@ -7,7 +7,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from supportops_api.application.response_suggestions import ResponseSuggestionRepository
-from supportops_api.domain.response_suggestions import SuggestedResponse, SuggestedResponseStatus
+from supportops_api.domain.response_suggestions import (
+    SuggestedResponse,
+    SuggestedResponseConfidenceLevel,
+    SuggestedResponseStatus,
+)
 from supportops_api.infrastructure.persistence.models import SuggestedResponseRecord
 
 
@@ -51,6 +55,8 @@ def _suggestion_to_record(suggestion: SuggestedResponse) -> SuggestedResponseRec
         content=suggestion.content,
         status=suggestion.status.value,
         sources=suggestion.sources,
+        confidence_score=suggestion.confidence_score,
+        confidence_level=suggestion.confidence_level.value,
         created_at=suggestion.created_at,
         updated_at=suggestion.updated_at,
     )
@@ -63,6 +69,8 @@ def _update_suggestion_record(
     record.content = suggestion.content
     record.status = suggestion.status.value
     record.sources = suggestion.sources
+    record.confidence_score = suggestion.confidence_score
+    record.confidence_level = suggestion.confidence_level.value
     record.created_at = suggestion.created_at
     record.updated_at = suggestion.updated_at
 
@@ -75,6 +83,8 @@ def _record_to_suggestion(record: SuggestedResponseRecord) -> SuggestedResponse:
         content=record.content,
         status=SuggestedResponseStatus(record.status),
         sources=sources,
+        confidence_score=record.confidence_score,
+        confidence_level=SuggestedResponseConfidenceLevel(record.confidence_level),
         created_at=record.created_at,
         updated_at=record.updated_at,
     )

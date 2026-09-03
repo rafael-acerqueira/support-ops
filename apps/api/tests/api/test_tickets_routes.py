@@ -17,7 +17,11 @@ from supportops_api.application.response_suggestions import (
 )
 from supportops_api.application.tickets import TicketRepository
 from supportops_api.domain.documents import ProductArea
-from supportops_api.domain.response_suggestions import SuggestedResponse, SuggestedResponseStatus
+from supportops_api.domain.response_suggestions import (
+    SuggestedResponse,
+    SuggestedResponseConfidenceLevel,
+    SuggestedResponseStatus,
+)
 from supportops_api.domain.tickets import Ticket, TicketStatus
 from supportops_api.infrastructure.database import get_session
 
@@ -48,6 +52,8 @@ class FakeResponseSuggestionGenerator:
         return GeneratedSuggestedResponse(
             content=f"Suggested reply for {ticket.external_id}",
             sources=[{"document_name": "billing-playbook.md", "relevance_score": 0.9}],
+            confidence_score=0.9,
+            confidence_level=SuggestedResponseConfidenceLevel.HIGH,
         )
 
 
@@ -264,6 +270,8 @@ async def test_generate_suggested_response(
     assert body["content"] == "Suggested reply for TCK-1001"
     assert body["status"] == "draft"
     assert body["sources"] == [{"document_name": "billing-playbook.md", "relevance_score": 0.9}]
+    assert body["confidence_score"] == 0.9
+    assert body["confidence_level"] == "high"
     assert UUID(body["id"]) in suggestion_repository.suggestions
     assert session.commit_count == 1
 

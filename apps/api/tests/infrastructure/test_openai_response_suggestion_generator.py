@@ -9,6 +9,7 @@ from supportops_api.application.response_suggestions import (
     RetrievedKnowledgeSource,
 )
 from supportops_api.domain.documents import ProductArea
+from supportops_api.domain.response_suggestions import SuggestedResponseConfidenceLevel
 from supportops_api.domain.tickets import Ticket
 from supportops_api.infrastructure.suggestions import OpenAIResponseSuggestionGenerator
 
@@ -87,6 +88,8 @@ async def test_openai_response_suggestion_generator_returns_suggestion() -> None
             "excerpt": "Validate duplicate invoice charges before promising a refund.",
         }
     ]
+    assert generated.confidence_score == 0.91
+    assert generated.confidence_level == SuggestedResponseConfidenceLevel.HIGH
     assert responses.requests[0]["model"] == "gpt-4o-mini"
     instructions = str(responses.requests[0]["instructions"])
     input_text = str(responses.requests[0]["input"])

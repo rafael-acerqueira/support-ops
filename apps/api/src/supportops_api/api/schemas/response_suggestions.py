@@ -6,7 +6,11 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from supportops_api.domain.response_suggestions import SuggestedResponse, SuggestedResponseStatus
+from supportops_api.domain.response_suggestions import (
+    SuggestedResponse,
+    SuggestedResponseConfidenceLevel,
+    SuggestedResponseStatus,
+)
 
 
 class SuggestedResponseResponse(BaseModel):
@@ -15,6 +19,8 @@ class SuggestedResponseResponse(BaseModel):
     content: str
     status: SuggestedResponseStatus
     sources: list[dict[str, Any]]
+    confidence_score: float | None
+    confidence_level: SuggestedResponseConfidenceLevel
     created_at: datetime
     updated_at: datetime
 
@@ -26,6 +32,8 @@ class SuggestedResponseResponse(BaseModel):
             content=suggestion.content,
             status=suggestion.status,
             sources=suggestion.sources,
+            confidence_score=suggestion.confidence_score,
+            confidence_level=suggestion.confidence_level,
             created_at=suggestion.created_at,
             updated_at=suggestion.updated_at,
         )

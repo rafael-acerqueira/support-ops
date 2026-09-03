@@ -27,6 +27,8 @@ from supportops_api.application.response_suggestions import (
     ResponseGenerationProviderError,
     RetrievedKnowledgeSource,
     TicketKnowledgeRetriever,
+    confidence_level_for_score,
+    confidence_score_from_sources,
 )
 from supportops_api.application.tickets import (
     ChangeTicketPriority,
@@ -74,4 +76,6 @@ __all__ = [
     "TicketKnowledgeRetriever",
     "TicketNotFoundError",
     "TicketRepository",
+    "confidence_level_for_score",
+    "confidence_score_from_sources",
 ]

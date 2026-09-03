@@ -4,6 +4,7 @@ import pytest
 
 from supportops_api.domain.response_suggestions import (
     SuggestedResponse,
+    SuggestedResponseConfidenceLevel,
     SuggestedResponseStatus,
 )
 
@@ -17,6 +18,29 @@ def test_create_suggested_response_trims_content() -> None:
     assert suggestion.content == "Draft reply"
     assert suggestion.status == SuggestedResponseStatus.DRAFT
     assert suggestion.sources == []
+    assert suggestion.confidence_score is None
+    assert suggestion.confidence_level == SuggestedResponseConfidenceLevel.LOW
+
+
+def test_create_suggested_response_accepts_confidence() -> None:
+    suggestion = SuggestedResponse.create(
+        ticket_id=uuid4(),
+        content="Draft reply",
+        confidence_score=0.91,
+        confidence_level=SuggestedResponseConfidenceLevel.HIGH,
+    )
+
+    assert suggestion.confidence_score == 0.91
+    assert suggestion.confidence_level == SuggestedResponseConfidenceLevel.HIGH
+
+
+def test_suggested_response_rejects_invalid_confidence_score() -> None:
+    with pytest.raises(ValueError, match="confidence score must be between 0 and 1"):
+        SuggestedResponse.create(
+            ticket_id=uuid4(),
+            content="Draft reply",
+            confidence_score=1.1,
+        )
 
 
 def test_suggested_response_requires_content() -> None:
