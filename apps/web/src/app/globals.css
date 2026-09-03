@@ -1294,6 +1294,12 @@ tbody tr:last-child td {
   color: #cbd5e1;
 }
 
+.review-feedback.draft.low-confidence {
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.14);
+  color: #fdba74;
+}
+
 .review-feedback.approved {
   border: 1px solid #10b981;
   background: rgba(16, 185, 129, 0.16);

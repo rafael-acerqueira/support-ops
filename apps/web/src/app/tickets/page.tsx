@@ -195,13 +195,25 @@ function isLowConfidenceSource(source: SuggestedResponseSource) {
   );
 }
 
-function getReviewFeedback(status: SuggestedResponseStatus) {
+function getReviewFeedback(status: SuggestedResponseStatus, confidence: SuggestionConfidence) {
   if (status === 'approved') {
     return 'This suggested response has been approved for this ticket.';
   }
 
   if (status === 'rejected') {
     return 'This suggested response was rejected and should not be used as-is.';
+  }
+
+  if (confidence === 'none') {
+    return 'No trusted sources are attached. Verify the policy coverage before approving this draft.';
+  }
+
+  if (confidence === 'low') {
+    return 'Low-confidence draft. Validate the source match before approving this response.';
+  }
+
+  if (confidence === 'medium') {
+    return 'Medium-confidence draft. Review the retrieved source before approving.';
   }
 
   return 'Review this draft before using it in a customer reply.';
@@ -1168,7 +1180,12 @@ export default function TicketsPage() {
                   {latestSuggestedResponse ? (
                     <div className="review-panel">
                       <div
-                        className={`notice inline-notice review-feedback ${latestSuggestedResponse.status}`}
+                        className={`notice inline-notice review-feedback ${latestSuggestedResponse.status} ${
+                          latestSuggestedResponse.status === 'draft' &&
+                          ['none', 'low'].includes(latestSuggestionConfidence ?? 'none')
+                            ? 'low-confidence'
+                            : ''
+                        }`}
                         role="status"
                       >
                         {latestSuggestedResponse.status === 'approved' ? (
@@ -1178,7 +1195,10 @@ export default function TicketsPage() {
                         ) : (
                           <Clock size={16} aria-hidden="true" />
                         )}
-                        {getReviewFeedback(latestSuggestedResponse.status)}
+                        {getReviewFeedback(
+                          latestSuggestedResponse.status,
+                          latestSuggestionConfidence ?? 'none'
+                        )}
                       </div>
                       <div className="review-actions">
                         <button
