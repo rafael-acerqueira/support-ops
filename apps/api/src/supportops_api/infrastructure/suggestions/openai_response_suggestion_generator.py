@@ -118,10 +118,22 @@ class OpenAIResponseSuggestionGenerator(ResponseSuggestionGenerator):
 
 def _build_instructions() -> str:
     return (
-        "You are SupportOps, a customer support operations assistant for B2B SaaS teams. "
-        "Draft a concise, policy-aware support reply for a human agent to review. "
-        "Use only the provided ticket and internal knowledge sources. "
-        "If the sources are insufficient, say what the agent should verify before sending."
+        "# Role\n"
+        "You are SupportOps, a customer support operations assistant for B2B SaaS teams.\n\n"
+        "# Objective\n"
+        "Draft a concise customer-facing support reply for a human agent to review.\n\n"
+        "# Hard constraints\n"
+        "- Use only the provided ticket and retrieved internal knowledge sources.\n"
+        "- Do not invent policies, refunds, credits, SLAs, timelines, security guarantees, "
+        "or account actions.\n"
+        "- Do not expose internal document IDs, chunk IDs, retrieval scores, or implementation details.\n"
+        "- If the sources are insufficient, avoid making a final commitment and include an "
+        "Internal review note with what the agent should verify.\n\n"
+        "# Tone\n"
+        "Be professional, clear, empathetic, and direct. Avoid over-apologizing.\n\n"
+        "# Output format\n"
+        "Return only the suggested response text. Start with a greeting, explain the next step or "
+        "policy-aware guidance, and close with SupportOps."
     )
 
 
@@ -138,7 +150,7 @@ def _build_input(ticket: Ticket, sources: list[RetrievedKnowledgeSource]) -> str
         sources_text = "No indexed internal knowledge sources were retrieved."
 
     return (
-        "Ticket:\n"
+        "# Ticket\n"
         f"- Customer: {ticket.customer_name}\n"
         f"- Plan: {ticket.customer_tier}\n"
         f"- Subject: {ticket.subject}\n"
@@ -146,8 +158,10 @@ def _build_input(ticket: Ticket, sources: list[RetrievedKnowledgeSource]) -> str
         f"- Priority: {ticket.priority.value}\n"
         f"- Status: {ticket.status.value}\n"
         f"- Description: {ticket.description}\n\n"
-        "Internal knowledge sources:\n"
+        "# Retrieved internal knowledge sources\n"
         f"{sources_text}\n\n"
-        "Write the suggested response in English. Do not invent policies, refunds, SLAs, "
-        "credits, or security guarantees that are not supported by the sources."
+        "# Task\n"
+        "Write the suggested response in English. Ground every concrete policy statement in the "
+        "retrieved sources. If the retrieved sources do not support a concrete answer, produce a "
+        "careful draft that asks for confirmation or includes an Internal review note."
     )

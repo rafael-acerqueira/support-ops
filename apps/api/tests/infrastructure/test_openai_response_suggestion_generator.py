@@ -88,8 +88,16 @@ async def test_openai_response_suggestion_generator_returns_suggestion() -> None
         }
     ]
     assert responses.requests[0]["model"] == "gpt-4o-mini"
-    assert "Billing export failed" in str(responses.requests[0]["input"])
-    assert "Validate duplicate invoice charges" in str(responses.requests[0]["input"])
+    instructions = str(responses.requests[0]["instructions"])
+    input_text = str(responses.requests[0]["input"])
+    assert "# Hard constraints" in instructions
+    assert "Do not invent policies" in instructions
+    assert "Internal review note" in instructions
+    assert "# Ticket" in input_text
+    assert "Billing export failed" in input_text
+    assert "# Retrieved internal knowledge sources" in input_text
+    assert "Validate duplicate invoice charges" in input_text
+    assert "# Task" in input_text
 
 
 @pytest.mark.asyncio
