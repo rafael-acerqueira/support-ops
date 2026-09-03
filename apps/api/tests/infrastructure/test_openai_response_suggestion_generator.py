@@ -90,6 +90,10 @@ async def test_openai_response_suggestion_generator_returns_suggestion() -> None
     ]
     assert generated.confidence_score == 0.91
     assert generated.confidence_level == SuggestedResponseConfidenceLevel.HIGH
+    assert (
+        generated.confidence_reason
+        == "Best retrieved source matched this ticket with 91% relevance from billing-playbook.md."
+    )
     assert responses.requests[0]["model"] == "gpt-4o-mini"
     instructions = str(responses.requests[0]["instructions"])
     input_text = str(responses.requests[0]["input"])

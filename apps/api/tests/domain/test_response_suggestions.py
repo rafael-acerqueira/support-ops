@@ -20,6 +20,10 @@ def test_create_suggested_response_trims_content() -> None:
     assert suggestion.sources == []
     assert suggestion.confidence_score is None
     assert suggestion.confidence_level == SuggestedResponseConfidenceLevel.LOW
+    assert (
+        suggestion.confidence_reason
+        == "No trusted knowledge sources were retrieved for this ticket."
+    )
 
 
 def test_create_suggested_response_accepts_confidence() -> None:
@@ -28,10 +32,15 @@ def test_create_suggested_response_accepts_confidence() -> None:
         content="Draft reply",
         confidence_score=0.91,
         confidence_level=SuggestedResponseConfidenceLevel.HIGH,
+        confidence_reason="Best retrieved source matched this ticket with 91% relevance.",
     )
 
     assert suggestion.confidence_score == 0.91
     assert suggestion.confidence_level == SuggestedResponseConfidenceLevel.HIGH
+    assert (
+        suggestion.confidence_reason
+        == "Best retrieved source matched this ticket with 91% relevance."
+    )
 
 
 def test_suggested_response_rejects_invalid_confidence_score() -> None:
@@ -40,6 +49,15 @@ def test_suggested_response_rejects_invalid_confidence_score() -> None:
             ticket_id=uuid4(),
             content="Draft reply",
             confidence_score=1.1,
+        )
+
+
+def test_suggested_response_requires_confidence_reason() -> None:
+    with pytest.raises(ValueError, match="confidence reason is required"):
+        SuggestedResponse.create(
+            ticket_id=uuid4(),
+            content="Draft reply",
+            confidence_reason="   ",
         )
 
 

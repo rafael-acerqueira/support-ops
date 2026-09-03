@@ -6,6 +6,7 @@ from supportops_api.application.response_suggestions import (
     RetrievedKnowledgeSource,
     TicketKnowledgeRetriever,
     confidence_level_for_score,
+    confidence_reason_from_sources,
     confidence_score_from_sources,
 )
 from supportops_api.domain.tickets import Ticket
@@ -36,6 +37,7 @@ class BasicResponseSuggestionGenerator(ResponseSuggestionGenerator):
             sources=sources,
             confidence_score=confidence_score,
             confidence_level=confidence_level_for_score(confidence_score),
+            confidence_reason=confidence_reason_from_sources(knowledge_sources),
         )
 
 

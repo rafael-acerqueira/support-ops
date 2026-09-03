@@ -28,6 +28,7 @@ from supportops_api.application.response_suggestions import (
     RetrievedKnowledgeSource,
     TicketKnowledgeRetriever,
     confidence_level_for_score,
+    confidence_reason_from_sources,
     confidence_score_from_sources,
 )
 from supportops_api.application.tickets import (
@@ -77,5 +78,6 @@ __all__ = [
     "TicketNotFoundError",
     "TicketRepository",
     "confidence_level_for_score",
+    "confidence_reason_from_sources",
     "confidence_score_from_sources",
 ]

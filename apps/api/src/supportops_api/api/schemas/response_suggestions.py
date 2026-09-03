@@ -21,6 +21,7 @@ class SuggestedResponseResponse(BaseModel):
     sources: list[dict[str, Any]]
     confidence_score: float | None
     confidence_level: SuggestedResponseConfidenceLevel
+    confidence_reason: str
     created_at: datetime
     updated_at: datetime
 
@@ -34,6 +35,7 @@ class SuggestedResponseResponse(BaseModel):
             sources=suggestion.sources,
             confidence_score=suggestion.confidence_score,
             confidence_level=suggestion.confidence_level,
+            confidence_reason=suggestion.confidence_reason,
             created_at=suggestion.created_at,
             updated_at=suggestion.updated_at,
         )

@@ -83,6 +83,7 @@ class SuggestedResponseRecord(Base):
     sources: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     confidence_level: Mapped[str] = mapped_column(String(32), nullable=False, default="low")
+    confidence_reason: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
