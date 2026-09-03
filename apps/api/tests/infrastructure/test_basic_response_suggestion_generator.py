@@ -4,6 +4,7 @@ import pytest
 
 from supportops_api.application.response_suggestions import RetrievedKnowledgeSource
 from supportops_api.domain.documents import ProductArea
+from supportops_api.domain.response_suggestions import SuggestedResponseConfidenceLevel
 from supportops_api.domain.tickets import Ticket
 from supportops_api.infrastructure.suggestions import BasicResponseSuggestionGenerator
 
@@ -29,6 +30,12 @@ async def test_basic_response_suggestion_generator_returns_draft_content() -> No
     assert "needs careful human review" in generated_response.content
     assert "SupportOps" in generated_response.content
     assert generated_response.sources == []
+    assert generated_response.confidence_score is None
+    assert generated_response.confidence_level == SuggestedResponseConfidenceLevel.LOW
+    assert (
+        generated_response.confidence_reason
+        == "No trusted knowledge sources were retrieved for this ticket."
+    )
 
 
 @pytest.mark.asyncio
@@ -49,6 +56,12 @@ async def test_basic_response_suggestion_generator_uses_retrieved_sources() -> N
             "excerpt": "Validate duplicate invoice charges before promising a refund.",
         }
     ]
+    assert generated_response.confidence_score == 0.91
+    assert generated_response.confidence_level == SuggestedResponseConfidenceLevel.HIGH
+    assert (
+        generated_response.confidence_reason
+        == "Best retrieved source matched this ticket with 91% relevance from billing-playbook.md."
+    )
 
 
 class FakeKnowledgeRetriever:

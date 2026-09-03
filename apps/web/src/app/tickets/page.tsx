@@ -29,7 +29,8 @@ type SuggestedResponseStatus = 'draft' | 'approved' | 'rejected';
 type RiskLevel = 'Low' | 'Medium' | 'High';
 type ProductArea = 'billing' | 'security' | 'support' | 'api' | 'product' | 'legal';
 type FilterValue = 'all' | string;
-type SuggestionConfidence = 'supported' | 'low' | 'none';
+type SuggestionConfidenceLevel = 'low' | 'medium' | 'high';
+type SuggestionConfidence = SuggestionConfidenceLevel | 'none';
 type TicketReadinessTone = 'success' | 'warning' | 'neutral';
 
 type SuggestedResponseSource = {
@@ -48,6 +49,9 @@ type SuggestedResponse = {
   content: string;
   status: SuggestedResponseStatus;
   sources: SuggestedResponseSource[];
+  confidence_score: number | null;
+  confidence_level: SuggestionConfidenceLevel;
+  confidence_reason: string;
   created_at: string;
   updated_at: string;
 };
@@ -86,6 +90,13 @@ const suggestedResponseStatusLabels: Record<SuggestedResponseStatus, string> = {
   draft: 'Draft',
   approved: 'Approved',
   rejected: 'Rejected',
+};
+
+const suggestionConfidenceLabels: Record<SuggestionConfidence, string> = {
+  none: 'No sources',
+  low: 'Low confidence',
+  medium: 'Medium confidence',
+  high: 'High confidence',
 };
 
 const statusIcons = {
@@ -136,7 +147,9 @@ function formatRelevanceScore(value?: number) {
 }
 
 function getSuggestionConfidence(suggestion: SuggestedResponse): SuggestionConfidence {
-  if (suggestion.sources.length === 0) return 'none';
+  if (suggestion.sources.length === 0 || suggestion.confidence_score === null) return 'none';
+
+  if (suggestion.confidence_level) return suggestion.confidence_level;
 
   const scores = suggestion.sources
     .map((source) => source.relevance_score)
@@ -144,7 +157,11 @@ function getSuggestionConfidence(suggestion: SuggestedResponse): SuggestionConfi
 
   if (!scores.length) return 'low';
 
-  return Math.max(...scores) >= lowConfidenceThreshold ? 'supported' : 'low';
+  const bestScore = Math.max(...scores);
+
+  if (bestScore >= 0.75) return 'high';
+  if (bestScore >= lowConfidenceThreshold) return 'medium';
+  return 'low';
 }
 
 function getSuggestionConfidenceMessage(confidence: SuggestionConfidence) {
@@ -156,7 +173,21 @@ function getSuggestionConfidenceMessage(confidence: SuggestionConfidence) {
     return 'The retrieved sources have low relevance. Validate the answer against internal policy before using it.';
   }
 
-  return 'This suggestion is backed by retrieved document sources.';
+  if (confidence === 'medium') {
+    return 'This suggestion has a usable source match, but should still be reviewed before approval.';
+  }
+
+  return 'This suggestion is backed by strong retrieved document sources.';
+}
+
+function formatSuggestionConfidence(suggestion: SuggestedResponse) {
+  const confidence = getSuggestionConfidence(suggestion);
+  const score =
+    typeof suggestion.confidence_score === 'number'
+      ? ` / ${formatRelevanceScore(suggestion.confidence_score)}`
+      : '';
+
+  return `${suggestionConfidenceLabels[confidence]}${score}`;
 }
 
 function isLowConfidenceSource(source: SuggestedResponseSource) {
@@ -165,13 +196,25 @@ function isLowConfidenceSource(source: SuggestedResponseSource) {
   );
 }
 
-function getReviewFeedback(status: SuggestedResponseStatus) {
+function getReviewFeedback(status: SuggestedResponseStatus, confidence: SuggestionConfidence) {
   if (status === 'approved') {
     return 'This suggested response has been approved for this ticket.';
   }
 
   if (status === 'rejected') {
     return 'This suggested response was rejected and should not be used as-is.';
+  }
+
+  if (confidence === 'none') {
+    return 'No trusted sources are attached. Verify the policy coverage before approving this draft.';
+  }
+
+  if (confidence === 'low') {
+    return 'Low-confidence draft. Validate the source match before approving this response.';
+  }
+
+  if (confidence === 'medium') {
+    return 'Medium-confidence draft. Review the retrieved source before approving.';
   }
 
   return 'Review this draft before using it in a customer reply.';
@@ -1032,13 +1075,23 @@ export default function TicketsPage() {
                         className={`suggested-response-card ${latestSuggestedResponse.status}`}
                       >
                         <div className="suggested-response-meta">
-                          <span
-                            className={`suggested-response-status ${latestSuggestedResponse.status}`}
-                          >
-                            {suggestedResponseStatusLabels[latestSuggestedResponse.status]}
-                          </span>
+                          <div className="suggested-response-badges">
+                            <span
+                              className={`suggested-response-status ${latestSuggestedResponse.status}`}
+                            >
+                              {suggestedResponseStatusLabels[latestSuggestedResponse.status]}
+                            </span>
+                            <span
+                              className={`suggestion-confidence-badge ${latestSuggestionConfidence ?? 'none'}`}
+                            >
+                              {formatSuggestionConfidence(latestSuggestedResponse)}
+                            </span>
+                          </div>
                           <span>{formatDate(latestSuggestedResponse.created_at)}</span>
                         </div>
+                        <small className="suggestion-confidence-reason">
+                          {latestSuggestedResponse.confidence_reason}
+                        </small>
                         <p>{latestSuggestedResponse.content}</p>
                       </article>
                     )}
@@ -1048,7 +1101,7 @@ export default function TicketsPage() {
                     !suggestionError &&
                     latestSuggestedResponse &&
                     latestSuggestionConfidence &&
-                    latestSuggestionConfidence !== 'supported' && (
+                    latestSuggestionConfidence !== 'high' && (
                       <div
                         className={`notice inline-notice confidence-notice ${latestSuggestionConfidence}`}
                         role="status"
@@ -1131,7 +1184,12 @@ export default function TicketsPage() {
                   {latestSuggestedResponse ? (
                     <div className="review-panel">
                       <div
-                        className={`notice inline-notice review-feedback ${latestSuggestedResponse.status}`}
+                        className={`notice inline-notice review-feedback ${latestSuggestedResponse.status} ${
+                          latestSuggestedResponse.status === 'draft' &&
+                          ['none', 'low'].includes(latestSuggestionConfidence ?? 'none')
+                            ? 'low-confidence'
+                            : ''
+                        }`}
                         role="status"
                       >
                         {latestSuggestedResponse.status === 'approved' ? (
@@ -1141,7 +1199,10 @@ export default function TicketsPage() {
                         ) : (
                           <Clock size={16} aria-hidden="true" />
                         )}
-                        {getReviewFeedback(latestSuggestedResponse.status)}
+                        {getReviewFeedback(
+                          latestSuggestedResponse.status,
+                          latestSuggestionConfidence ?? 'none'
+                        )}
                       </div>
                       <div className="review-actions">
                         <button
@@ -1202,11 +1263,23 @@ export default function TicketsPage() {
                           key={suggestion.id}
                         >
                           <div className="suggestion-history-header">
-                            <span className={`suggested-response-status ${suggestion.status}`}>
-                              {suggestedResponseStatusLabels[suggestion.status]}
-                            </span>
+                            <div className="suggested-response-badges">
+                              <span className={`suggested-response-status ${suggestion.status}`}>
+                                {suggestedResponseStatusLabels[suggestion.status]}
+                              </span>
+                              <span
+                                className={`suggestion-confidence-badge ${getSuggestionConfidence(
+                                  suggestion
+                                )}`}
+                              >
+                                {formatSuggestionConfidence(suggestion)}
+                              </span>
+                            </div>
                             <span>{formatDate(suggestion.created_at)}</span>
                           </div>
+                          <small className="suggestion-confidence-reason compact">
+                            {suggestion.confidence_reason}
+                          </small>
                           <p>{suggestion.content}</p>
                           {suggestion.sources.length ? (
                             <div className="history-source-list">

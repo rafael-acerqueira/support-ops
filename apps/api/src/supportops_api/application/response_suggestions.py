@@ -5,7 +5,10 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from supportops_api.application.tickets import TicketNotFoundError, TicketRepository
-from supportops_api.domain.response_suggestions import SuggestedResponse
+from supportops_api.domain.response_suggestions import (
+    SuggestedResponse,
+    SuggestedResponseConfidenceLevel,
+)
 from supportops_api.domain.tickets import Ticket
 
 
@@ -37,6 +40,9 @@ class ResponseSuggestionRepository(Protocol):
 class GeneratedSuggestedResponse:
     content: str
     sources: list[dict[str, Any]]
+    confidence_score: float | None = None
+    confidence_level: SuggestedResponseConfidenceLevel = SuggestedResponseConfidenceLevel.LOW
+    confidence_reason: str = "No trusted knowledge sources were retrieved for this ticket."
 
 
 @dataclass(frozen=True)
@@ -80,6 +86,42 @@ class TicketKnowledgeRetriever(Protocol):
         pass
 
 
+def confidence_level_for_score(score: float | None) -> SuggestedResponseConfidenceLevel:
+    if score is None:
+        return SuggestedResponseConfidenceLevel.LOW
+
+    if score >= 0.75:
+        return SuggestedResponseConfidenceLevel.HIGH
+
+    if score >= 0.5:
+        return SuggestedResponseConfidenceLevel.MEDIUM
+
+    return SuggestedResponseConfidenceLevel.LOW
+
+
+def confidence_score_from_sources(
+    sources: list[RetrievedKnowledgeSource],
+) -> float | None:
+    if not sources:
+        return None
+
+    return max(source.relevance_score for source in sources)
+
+
+def confidence_reason_from_sources(
+    sources: list[RetrievedKnowledgeSource],
+) -> str:
+    if not sources:
+        return "No trusted knowledge sources were retrieved for this ticket."
+
+    best_source = max(sources, key=lambda source: source.relevance_score)
+    score_percent = round(best_source.relevance_score * 100)
+    return (
+        f"Best retrieved source matched this ticket with {score_percent}% relevance "
+        f"from {best_source.document_name}."
+    )
+
+
 class ResponseSuggestionGenerator(Protocol):
     async def generate(self, ticket: Ticket) -> GeneratedSuggestedResponse:
         pass
@@ -111,6 +153,9 @@ class GenerateSuggestedResponse:
             ticket_id=ticket.id,
             content=generated_response.content,
             sources=generated_response.sources,
+            confidence_score=generated_response.confidence_score,
+            confidence_level=generated_response.confidence_level,
+            confidence_reason=generated_response.confidence_reason,
         )
         await self._suggestion_repository.add(suggestion)
         return suggestion

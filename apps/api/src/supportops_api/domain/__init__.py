@@ -5,6 +5,7 @@ from supportops_api.domain.documents import (
     DocumentType,
     ProductArea,
 )
+from supportops_api.domain.response_suggestions import SuggestedResponseConfidenceLevel
 from supportops_api.domain.tickets import (
     Ticket,
     TicketPriority,
@@ -17,6 +18,7 @@ __all__ = [
     "DocumentStatus",
     "DocumentType",
     "ProductArea",
+    "SuggestedResponseConfidenceLevel",
     "Ticket",
     "TicketPriority",
     "TicketStatus",

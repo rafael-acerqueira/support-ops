@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -81,6 +81,9 @@ class SuggestedResponseRecord(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     sources: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence_level: Mapped[str] = mapped_column(String(32), nullable=False, default="low")
+    confidence_reason: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
