@@ -1210,6 +1210,12 @@ tbody tr:last-child td {
   line-height: 1.4;
 }
 
+.suggested-response-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .suggested-response-status {
   border-radius: 16px;
   padding: 4px 8px;
@@ -1235,6 +1241,34 @@ tbody tr:last-child td {
   border: 1px solid #dc2626;
   background: rgba(220, 38, 38, 0.2);
   color: #fca5a5;
+}
+
+.suggestion-confidence-badge {
+  border-radius: 16px;
+  padding: 4px 8px;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.suggestion-confidence-badge.none,
+.suggestion-confidence-badge.low {
+  border: 1px solid rgba(249, 115, 22, 0.45);
+  background: rgba(249, 115, 22, 0.14);
+  color: #fdba74;
+}
+
+.suggestion-confidence-badge.medium {
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.14);
+  color: #fcd34d;
+}
+
+.suggestion-confidence-badge.high {
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.14);
+  color: #34d399;
 }
 
 .review-actions {
@@ -1282,6 +1316,12 @@ tbody tr:last-child td {
   border: 1px solid #f97316;
   background: rgba(249, 115, 22, 0.14);
   color: #fdba74;
+}
+
+.confidence-notice.medium {
+  border: 1px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
 }
 
 .approve-action:hover:not(:disabled) {
