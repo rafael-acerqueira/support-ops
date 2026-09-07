@@ -150,6 +150,93 @@ class Document:
         self.updated_at = _utcnow()
 
 
+@dataclass
+class DocumentVersion:
+    document_id: UUID
+    version: str
+    source_file_name: str
+    content_type: str
+    size_bytes: int
+    storage_key: str
+    id: UUID = field(default_factory=uuid4)
+    status: DocumentStatus = DocumentStatus.UPLOADED
+    chunk_count: int = 0
+    failure_reason: str | None = None
+    created_at: datetime = field(default_factory=_utcnow)
+    updated_at: datetime = field(default_factory=_utcnow)
+    activated_at: datetime | None = None
+    last_processed_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        self.version = self.version.strip()
+        self.source_file_name = self.source_file_name.strip()
+        self.content_type = self.content_type.strip()
+        self.storage_key = self.storage_key.strip()
+
+        if not self.version:
+            raise ValueError("Document version is required")
+        if not self.source_file_name:
+            raise ValueError("Source file name is required")
+        if not self.content_type:
+            raise ValueError("Content type is required")
+        if not self.storage_key:
+            raise ValueError("Storage key is required")
+        if self.size_bytes <= 0:
+            raise ValueError("Document version size must be greater than zero")
+        if self.chunk_count < 0:
+            raise ValueError("Chunk count cannot be negative")
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        document_id: UUID,
+        version: str,
+        source_file_name: str,
+        content_type: str,
+        size_bytes: int,
+        storage_key: str,
+    ) -> DocumentVersion:
+        return cls(
+            document_id=document_id,
+            version=version,
+            source_file_name=source_file_name,
+            content_type=content_type,
+            size_bytes=size_bytes,
+            storage_key=storage_key,
+        )
+
+    def start_processing(self) -> None:
+        self.status = DocumentStatus.PROCESSING
+        self.failure_reason = None
+        self.updated_at = _utcnow()
+
+    def mark_indexed(self, *, chunk_count: int) -> None:
+        if chunk_count <= 0:
+            raise ValueError("Indexed document versions must have at least one chunk")
+
+        now = _utcnow()
+        self.status = DocumentStatus.INDEXED
+        self.chunk_count = chunk_count
+        self.failure_reason = None
+        self.last_processed_at = now
+        self.updated_at = now
+
+    def mark_failed(self, reason: str) -> None:
+        reason = reason.strip()
+        if not reason:
+            raise ValueError("Failure reason is required")
+
+        self.status = DocumentStatus.FAILED
+        self.failure_reason = reason
+        self.updated_at = _utcnow()
+
+    def activate(self) -> None:
+        now = _utcnow()
+        self.activated_at = now
+        self.updated_at = now
+
+
 @dataclass(frozen=True)
 class DocumentChunk:
     document_id: UUID

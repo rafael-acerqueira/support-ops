@@ -3,6 +3,7 @@ from supportops_api.domain.documents import (
     DocumentChunk,
     DocumentStatus,
     DocumentType,
+    DocumentVersion,
     ProductArea,
 )
 from supportops_api.domain.response_suggestions import SuggestedResponseConfidenceLevel
@@ -17,6 +18,7 @@ __all__ = [
     "DocumentChunk",
     "DocumentStatus",
     "DocumentType",
+    "DocumentVersion",
     "ProductArea",
     "SuggestedResponseConfidenceLevel",
     "Ticket",
