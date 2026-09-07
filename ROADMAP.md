@@ -58,8 +58,8 @@ are tracked in Phase 2+.
 - [x] pgvector search through PostgresDocumentChunkRepository
 - [x] DeterministicEmbeddingGenerator for local development
 - [x] FastAPI wiring/dependency injection
+- [x] OpenAI embedding adapter
 - [ ] S3DocumentStorageAdapter (MinIO/S3)
-- [ ] OpenAI embedding adapter
 
 ### API (FastAPI)
 
@@ -122,18 +122,18 @@ are tracked in Phase 2+.
 
 ### Advanced RAG Features
 
-- [ ] Real embedding provider
-- [ ] LLM response generation from retrieved sources
+- [x] Real embedding provider
+- [x] LLM response generation from retrieved sources
 - [ ] Document versioning
 - [ ] Reranking (cross-encoder or LLM-based)
 - [ ] Hybrid retrieval (keyword + vector + rerank)
-- [ ] Confidence scoring refinement
+- [x] Initial confidence scoring refinement (score, level, and reason)
 - [ ] Citation validation & guardrails
-- [ ] Low-confidence detection
+- [x] Initial low-confidence detection and additional review signal
 
 ### Human-in-the-Loop
 
-- [ ] Review/approval workflow
+- [x] Review/approval workflow
 - [ ] Feedback collection UI
 - [ ] Review persistence to DB
 - [ ] Golden dataset creation

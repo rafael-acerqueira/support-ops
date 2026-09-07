@@ -121,15 +121,23 @@ pnpm install
 ```bash
 cd apps/api && uv sync
 cd ../workers && uv sync
+cd ../..
 ```
 
-6. **Start the local scaffold**
+6. **Run database migrations**
+
+```bash
+npm run db:migrate
+```
+
+7. **Start the local app**
 
 ```bash
 npm run dev
 ```
 
-This runs the frontend, API, and workers in parallel. No database tables or migrations are required for the current scaffold.
+This runs the frontend, API, and workers in parallel. The API expects database
+migrations to be applied before using document, ticket, and suggestion workflows.
 
 ### Optional: Start services individually
 
@@ -186,7 +194,7 @@ cd apps/workers && uv run celery -A src.celery_app flower --port=5555
 - `PATCH /api/tickets/{id}/suggested-responses/{suggestion_id}/approve` - Approve suggested response
 - `PATCH /api/tickets/{id}/suggested-responses/{suggestion_id}/reject` - Reject suggested response
 
-### Evaluations
+### Evaluations (planned)
 
 - `GET /api/evaluations/summary` - Metrics overview
 - `GET /api/evaluations/experiments` - RAG experiments
@@ -197,7 +205,7 @@ cd apps/workers && uv run celery -A src.celery_app flower --port=5555
 1. **Documents** - Upload and manage knowledge base
 2. **Tickets** - List and filter support requests
 3. **Ticket Detail** - View customer issue and AI-suggested response
-4. **Evaluations** - Dashboard with metrics and analysis
+4. **Evaluations** - Planned dashboard with metrics and analysis
 
 ## 🎨 Design System
 
@@ -220,7 +228,8 @@ npm run docker:up        # Start local infrastructure
 npm run dev              # Start all services in parallel
 npm run build            # Build all apps
 npm run lint             # Lint all code
-npm run test             # Run all tests
+npm run test             # Run configured test suites through Turbo
+npm run type-check       # Run TypeScript type checks
 npm run format           # Format code with Prettier
 npm run clean            # Clean all artifacts
 
@@ -251,7 +260,8 @@ uv run pytest --cov             # With coverage
 
 # Frontend tests
 cd ../web
-npm run test                         # Jest/Vitest
+pnpm run type-check              # TypeScript
+pnpm run build                   # Next.js production build
 
 # Workers tests
 cd ../workers
@@ -302,16 +312,19 @@ docker build -t supportops-workers:latest apps/workers -f apps/workers/Dockerfil
 - ✅ Manual ticket creation
 - ✅ Suggested response workflow
 - ✅ Human review actions for suggestions
+- ✅ OpenAI embeddings and LLM response generation behind provider configuration
+- ✅ Suggestion confidence score, level, reason, and additional review signal
 - ✅ Manual MVP test flow documentation
-- Deterministic local RAG only; real AI providers move to Phase 2
 
 ### Phase 2 - Production Ready (Weeks 3-4)
 
-- Real embedding provider
-- LLM response generation
+- ✅ Real embedding provider
+- ✅ LLM response generation from retrieved sources
+- ✅ Initial confidence scoring
+- ✅ Initial low-confidence/additional-review detection
 - Document versioning
 - Reranking
-- Confidence scoring
+- Citation validation & guardrails
 - Metrics & evaluation
 - Langsmith integration
 - Hardening & testing
