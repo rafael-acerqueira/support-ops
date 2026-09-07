@@ -52,6 +52,7 @@ type SuggestedResponse = {
   confidence_score: number | null;
   confidence_level: SuggestionConfidenceLevel;
   confidence_reason: string;
+  requires_additional_review: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -196,7 +197,9 @@ function isLowConfidenceSource(source: SuggestedResponseSource) {
   );
 }
 
-function getReviewFeedback(status: SuggestedResponseStatus, confidence: SuggestionConfidence) {
+function getReviewFeedback(suggestion: SuggestedResponse, confidence: SuggestionConfidence) {
+  const { status } = suggestion;
+
   if (status === 'approved') {
     return 'This suggested response has been approved for this ticket.';
   }
@@ -205,12 +208,12 @@ function getReviewFeedback(status: SuggestedResponseStatus, confidence: Suggesti
     return 'This suggested response was rejected and should not be used as-is.';
   }
 
-  if (confidence === 'none') {
+  if (suggestion.requires_additional_review && confidence === 'none') {
     return 'No trusted sources are attached. Verify the policy coverage before approving this draft.';
   }
 
-  if (confidence === 'low') {
-    return 'Low-confidence draft. Validate the source match before approving this response.';
+  if (suggestion.requires_additional_review) {
+    return 'Additional review recommended. Validate the source match before approving this response.';
   }
 
   if (confidence === 'medium') {
@@ -1186,7 +1189,7 @@ export default function TicketsPage() {
                       <div
                         className={`notice inline-notice review-feedback ${latestSuggestedResponse.status} ${
                           latestSuggestedResponse.status === 'draft' &&
-                          ['none', 'low'].includes(latestSuggestionConfidence ?? 'none')
+                          latestSuggestedResponse.requires_additional_review
                             ? 'low-confidence'
                             : ''
                         }`}
@@ -1200,7 +1203,7 @@ export default function TicketsPage() {
                           <Clock size={16} aria-hidden="true" />
                         )}
                         {getReviewFeedback(
-                          latestSuggestedResponse.status,
+                          latestSuggestedResponse,
                           latestSuggestionConfidence ?? 'none'
                         )}
                       </div>
