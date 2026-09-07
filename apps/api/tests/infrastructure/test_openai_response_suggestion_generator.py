@@ -94,6 +94,7 @@ async def test_openai_response_suggestion_generator_returns_suggestion() -> None
         generated.confidence_reason
         == "Best retrieved source matched this ticket with 91% relevance from billing-playbook.md."
     )
+    assert generated.requires_additional_review is False
     assert responses.requests[0]["model"] == "gpt-4o-mini"
     instructions = str(responses.requests[0]["instructions"])
     input_text = str(responses.requests[0]["input"])

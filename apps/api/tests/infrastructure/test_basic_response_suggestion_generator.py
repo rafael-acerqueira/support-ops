@@ -36,6 +36,7 @@ async def test_basic_response_suggestion_generator_returns_draft_content() -> No
         generated_response.confidence_reason
         == "No trusted knowledge sources were retrieved for this ticket."
     )
+    assert generated_response.requires_additional_review is True
 
 
 @pytest.mark.asyncio
@@ -62,6 +63,7 @@ async def test_basic_response_suggestion_generator_uses_retrieved_sources() -> N
         generated_response.confidence_reason
         == "Best retrieved source matched this ticket with 91% relevance from billing-playbook.md."
     )
+    assert generated_response.requires_additional_review is False
 
 
 class FakeKnowledgeRetriever:

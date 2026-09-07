@@ -23,6 +23,7 @@ from supportops_api.application.response_suggestions import (
     confidence_level_for_score,
     confidence_reason_from_sources,
     confidence_score_from_sources,
+    requires_additional_review_for_confidence,
 )
 from supportops_api.domain.tickets import Ticket
 from supportops_api.infrastructure.suggestions.basic_response_suggestion_generator import (
@@ -57,12 +58,14 @@ class OpenAIResponseSuggestionGenerator(ResponseSuggestionGenerator):
             )
 
         confidence_score = confidence_score_from_sources(knowledge_sources)
+        confidence_level = confidence_level_for_score(confidence_score)
         return GeneratedSuggestedResponse(
             content=content,
             sources=[_source_to_response(source) for source in knowledge_sources],
             confidence_score=confidence_score,
-            confidence_level=confidence_level_for_score(confidence_score),
+            confidence_level=confidence_level,
             confidence_reason=confidence_reason_from_sources(knowledge_sources),
+            requires_additional_review=requires_additional_review_for_confidence(confidence_level),
         )
 
     async def _create_response(

@@ -69,6 +69,7 @@ class FakeGenerator:
             confidence_score=0.9,
             confidence_level=SuggestedResponseConfidenceLevel.HIGH,
             confidence_reason="Best retrieved source matched this ticket with 90% relevance from billing-playbook.md.",
+            requires_additional_review=False,
         )
 
 
@@ -103,6 +104,7 @@ async def test_generate_suggested_response_persists_draft() -> None:
         suggestion.confidence_reason
         == "Best retrieved source matched this ticket with 90% relevance from billing-playbook.md."
     )
+    assert suggestion.requires_additional_review is False
     assert suggestion_repository.suggestions[suggestion.id] == suggestion
 
 

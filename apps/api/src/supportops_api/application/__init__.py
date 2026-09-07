@@ -30,6 +30,7 @@ from supportops_api.application.response_suggestions import (
     confidence_level_for_score,
     confidence_reason_from_sources,
     confidence_score_from_sources,
+    requires_additional_review_for_confidence,
 )
 from supportops_api.application.tickets import (
     ChangeTicketPriority,
@@ -80,4 +81,5 @@ __all__ = [
     "confidence_level_for_score",
     "confidence_reason_from_sources",
     "confidence_score_from_sources",
+    "requires_additional_review_for_confidence",
 ]

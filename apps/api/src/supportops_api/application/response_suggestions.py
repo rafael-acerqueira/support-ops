@@ -43,6 +43,7 @@ class GeneratedSuggestedResponse:
     confidence_score: float | None = None
     confidence_level: SuggestedResponseConfidenceLevel = SuggestedResponseConfidenceLevel.LOW
     confidence_reason: str = "No trusted knowledge sources were retrieved for this ticket."
+    requires_additional_review: bool = True
 
 
 @dataclass(frozen=True)
@@ -122,6 +123,12 @@ def confidence_reason_from_sources(
     )
 
 
+def requires_additional_review_for_confidence(
+    confidence_level: SuggestedResponseConfidenceLevel,
+) -> bool:
+    return confidence_level == SuggestedResponseConfidenceLevel.LOW
+
+
 class ResponseSuggestionGenerator(Protocol):
     async def generate(self, ticket: Ticket) -> GeneratedSuggestedResponse:
         pass
@@ -156,6 +163,7 @@ class GenerateSuggestedResponse:
             confidence_score=generated_response.confidence_score,
             confidence_level=generated_response.confidence_level,
             confidence_reason=generated_response.confidence_reason,
+            requires_additional_review=generated_response.requires_additional_review,
         )
         await self._suggestion_repository.add(suggestion)
         return suggestion
