@@ -22,6 +22,7 @@ class SuggestedResponseResponse(BaseModel):
     confidence_score: float | None
     confidence_level: SuggestedResponseConfidenceLevel
     confidence_reason: str
+    requires_additional_review: bool
     created_at: datetime
     updated_at: datetime
 
@@ -36,6 +37,7 @@ class SuggestedResponseResponse(BaseModel):
             confidence_score=suggestion.confidence_score,
             confidence_level=suggestion.confidence_level,
             confidence_reason=suggestion.confidence_reason,
+            requires_additional_review=suggestion.requires_additional_review,
             created_at=suggestion.created_at,
             updated_at=suggestion.updated_at,
         )

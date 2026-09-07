@@ -24,6 +24,7 @@ def test_create_suggested_response_trims_content() -> None:
         suggestion.confidence_reason
         == "No trusted knowledge sources were retrieved for this ticket."
     )
+    assert suggestion.requires_additional_review is True
 
 
 def test_create_suggested_response_accepts_confidence() -> None:
@@ -33,6 +34,7 @@ def test_create_suggested_response_accepts_confidence() -> None:
         confidence_score=0.91,
         confidence_level=SuggestedResponseConfidenceLevel.HIGH,
         confidence_reason="Best retrieved source matched this ticket with 91% relevance.",
+        requires_additional_review=False,
     )
 
     assert suggestion.confidence_score == 0.91
@@ -41,6 +43,7 @@ def test_create_suggested_response_accepts_confidence() -> None:
         suggestion.confidence_reason
         == "Best retrieved source matched this ticket with 91% relevance."
     )
+    assert suggestion.requires_additional_review is False
 
 
 def test_suggested_response_rejects_invalid_confidence_score() -> None:

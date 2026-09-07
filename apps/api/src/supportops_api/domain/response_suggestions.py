@@ -33,6 +33,7 @@ class SuggestedResponse:
     confidence_score: float | None = None
     confidence_level: SuggestedResponseConfidenceLevel = SuggestedResponseConfidenceLevel.LOW
     confidence_reason: str = "No trusted knowledge sources were retrieved for this ticket."
+    requires_additional_review: bool = True
     created_at: datetime = field(default_factory=_utcnow)
     updated_at: datetime = field(default_factory=_utcnow)
 
@@ -59,6 +60,7 @@ class SuggestedResponse:
         confidence_score: float | None = None,
         confidence_level: SuggestedResponseConfidenceLevel = SuggestedResponseConfidenceLevel.LOW,
         confidence_reason: str = "No trusted knowledge sources were retrieved for this ticket.",
+        requires_additional_review: bool = True,
     ) -> SuggestedResponse:
         return cls(
             ticket_id=ticket_id,
@@ -67,6 +69,7 @@ class SuggestedResponse:
             confidence_score=confidence_score,
             confidence_level=confidence_level,
             confidence_reason=confidence_reason,
+            requires_additional_review=requires_additional_review,
         )
 
     def approve(self) -> None:

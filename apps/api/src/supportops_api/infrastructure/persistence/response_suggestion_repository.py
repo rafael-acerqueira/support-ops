@@ -58,6 +58,7 @@ def _suggestion_to_record(suggestion: SuggestedResponse) -> SuggestedResponseRec
         confidence_score=suggestion.confidence_score,
         confidence_level=suggestion.confidence_level.value,
         confidence_reason=suggestion.confidence_reason,
+        requires_additional_review=suggestion.requires_additional_review,
         created_at=suggestion.created_at,
         updated_at=suggestion.updated_at,
     )
@@ -73,6 +74,7 @@ def _update_suggestion_record(
     record.confidence_score = suggestion.confidence_score
     record.confidence_level = suggestion.confidence_level.value
     record.confidence_reason = suggestion.confidence_reason
+    record.requires_additional_review = suggestion.requires_additional_review
     record.created_at = suggestion.created_at
     record.updated_at = suggestion.updated_at
 
@@ -88,6 +90,7 @@ def _record_to_suggestion(record: SuggestedResponseRecord) -> SuggestedResponse:
         confidence_score=record.confidence_score,
         confidence_level=SuggestedResponseConfidenceLevel(record.confidence_level),
         confidence_reason=record.confidence_reason,
+        requires_additional_review=record.requires_additional_review,
         created_at=record.created_at,
         updated_at=record.updated_at,
     )

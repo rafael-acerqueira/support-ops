@@ -19,6 +19,7 @@ def test_suggestion_record_roundtrip_preserves_domain_values() -> None:
         confidence_score=0.76,
         confidence_level=SuggestedResponseConfidenceLevel.HIGH,
         confidence_reason="Best retrieved source matched this ticket with 76% relevance from refund-policy.md.",
+        requires_additional_review=False,
     )
     suggestion.approve()
 
@@ -33,5 +34,6 @@ def test_suggestion_record_roundtrip_preserves_domain_values() -> None:
     assert mapped_suggestion.confidence_score == 0.76
     assert mapped_suggestion.confidence_level == SuggestedResponseConfidenceLevel.HIGH
     assert mapped_suggestion.confidence_reason == suggestion.confidence_reason
+    assert mapped_suggestion.requires_additional_review is False
     assert mapped_suggestion.created_at == suggestion.created_at
     assert mapped_suggestion.updated_at == suggestion.updated_at

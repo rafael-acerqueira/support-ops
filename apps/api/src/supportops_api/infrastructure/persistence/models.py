@@ -84,6 +84,7 @@ class SuggestedResponseRecord(Base):
     confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     confidence_level: Mapped[str] = mapped_column(String(32), nullable=False, default="low")
     confidence_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    requires_additional_review: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
