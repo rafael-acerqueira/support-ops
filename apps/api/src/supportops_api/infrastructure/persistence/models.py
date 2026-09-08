@@ -5,7 +5,8 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -132,6 +133,14 @@ class DocumentRecord(Base):
 
 class DocumentVersionRecord(Base):
     __tablename__ = "document_versions"
+    __table_args__ = (
+        Index(
+            "uq_document_versions_active_per_document",
+            "document_id",
+            unique=True,
+            postgresql_where=text("is_active = true"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True)
     document_id: Mapped[UUID] = mapped_column(
