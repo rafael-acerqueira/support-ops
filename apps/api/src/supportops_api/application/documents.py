@@ -320,6 +320,7 @@ class ProcessDocument:
 
         document.start_processing()
         await self._repository.save(document)
+        await self._sync_processing_version(document)
 
         try:
             chunks = await self._processor.process(document)
@@ -335,6 +336,14 @@ class ProcessDocument:
             await self._repository.save(document)
 
         return document
+
+    async def _sync_processing_version(self, document: Document) -> None:
+        version = await self._find_current_version(document)
+        if version is None:
+            return
+
+        version.start_processing()
+        await self._version_repository.save(version)
 
     async def _generate_embeddings(self, chunks: list[DocumentChunk]) -> list[DocumentChunk]:
         if self._embedding_generator is None:
@@ -364,7 +373,6 @@ class ProcessDocument:
         if version is None:
             return
 
-        version.start_processing()
         version.mark_indexed(chunk_count=document.chunk_count)
         await self._version_repository.deactivate_all_for_document(document.id)
         version.activate()

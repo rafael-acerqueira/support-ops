@@ -1,3 +1,4 @@
+from copy import copy
 from uuid import UUID, uuid4
 
 import pytest
@@ -65,7 +66,7 @@ class InMemoryDocumentVersionRepository:
 
     async def save(self, version: DocumentVersion) -> None:
         self.versions[version.id] = version
-        self.saved_versions.append(version)
+        self.saved_versions.append(copy(version))
 
     async def get(self, version_id: UUID) -> DocumentVersion | None:
         return self.versions.get(version_id)
@@ -382,7 +383,46 @@ async def test_process_document_syncs_current_version_when_version_repository_is
     assert version.is_active is True
     assert version.chunk_count == 2
     assert version.last_processed_at is not None
-    assert version_repository.saved_versions == [version]
+    assert version_repository.saved_versions[0].status == DocumentStatus.PROCESSING
+    assert version_repository.saved_versions[1].status == DocumentStatus.INDEXED
+    assert len(version_repository.saved_versions) == 2
+
+
+@pytest.mark.asyncio
+async def test_process_document_marks_current_version_processing_before_work() -> None:
+    repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = Document.create(
+        name="Refund Policy",
+        document_type=DocumentType.INTERNAL_POLICY,
+        product_area=ProductArea.BILLING,
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=1024,
+        storage_key="documents/refund-policy/v1.md",
+    )
+    version = DocumentVersion.create(
+        document_id=document.id,
+        version=document.version,
+        source_file_name=document.source_file_name,
+        content_type=document.content_type,
+        size_bytes=document.size_bytes,
+        storage_key=document.storage_key or "",
+    )
+    await repository.add(document)
+    await version_repository.add(version)
+
+    with pytest.raises(RuntimeError, match="Parser failed"):
+        await ProcessDocument(
+            repository,
+            FailingDocumentProcessor(),
+            version_repository=version_repository,
+        ).execute(document.id)
+
+    assert version_repository.saved_versions[0].status == DocumentStatus.PROCESSING
+    assert version_repository.saved_versions[1].status == DocumentStatus.FAILED
+    assert version_repository.saved_versions[1].failure_reason == "Parser failed"
+    assert len(version_repository.saved_versions) == 2
 
 
 @pytest.mark.asyncio
