@@ -178,6 +178,9 @@ cd apps/workers && uv run celery -A src.celery_app flower --port=5555
 - `POST /api/documents/upload` - Upload document and enqueue processing
 - `GET /api/documents` - List documents
 - `GET /api/documents/{id}` - Get document detail
+- `GET /api/documents/{id}/versions` - List document versions
+- `POST /api/documents/{id}/versions/upload` - Upload a new document version
+- `POST /api/documents/{id}/versions/{version_id}/activate` - Activate an indexed version
 - `POST /api/documents/{id}/process` - Reprocess chunks and embeddings
 - `POST /api/documents/{id}/activate` - Activate document
 - `POST /api/documents/{id}/deactivate` - Deactivate document
@@ -202,7 +205,7 @@ cd apps/workers && uv run celery -A src.celery_app flower --port=5555
 
 ## 📊 Screens (MVP)
 
-1. **Documents** - Upload and manage knowledge base
+1. **Documents** - Upload and manage knowledge base with version history
 2. **Tickets** - List and filter support requests
 3. **Ticket Detail** - View customer issue and AI-suggested response
 4. **Evaluations** - Planned dashboard with metrics and analysis
@@ -314,6 +317,7 @@ docker build -t supportops-workers:latest apps/workers -f apps/workers/Dockerfil
 - ✅ Human review actions for suggestions
 - ✅ OpenAI embeddings and LLM response generation behind provider configuration
 - ✅ Suggestion confidence score, level, reason, and additional review signal
+- ✅ Document version history, new version upload, and active version selection
 - ✅ Manual MVP test flow documentation
 
 ### Phase 2 - Production Ready (Weeks 3-4)
@@ -322,7 +326,8 @@ docker build -t supportops-workers:latest apps/workers -f apps/workers/Dockerfil
 - ✅ LLM response generation from retrieved sources
 - ✅ Initial confidence scoring
 - ✅ Initial low-confidence/additional-review detection
-- Document versioning
+- ✅ Document versioning compatibility workflow
+- Chunk storage linked directly to document versions
 - Reranking
 - Citation validation & guardrails
 - Metrics & evaluation

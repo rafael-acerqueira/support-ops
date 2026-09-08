@@ -20,7 +20,7 @@ are tracked in Phase 2+.
 
 - [x] Document and Chunk entities
 - [x] Ticket and SuggestedResponse entities
-- [ ] DocumentVersion entity
+- [x] DocumentVersion entity
 - [ ] User, Review entities
 - [ ] VersioningPolicy domain service
 - [ ] ConfidenceScorer domain service
@@ -78,7 +78,9 @@ are tracked in Phase 2+.
 - [x] GET /api/tickets/{id}/suggested-responses
 - [x] PATCH /api/tickets/{id}/suggested-responses/{suggestion_id}/approve
 - [x] PATCH /api/tickets/{id}/suggested-responses/{suggestion_id}/reject
-- [ ] GET /api/documents/{id}/versions
+- [x] GET /api/documents/{id}/versions
+- [x] POST /api/documents/{id}/versions/upload
+- [x] POST /api/documents/{id}/versions/{version_id}/activate
 - [ ] GET /api/evaluations/summary (basic)
 
 ### Workers (Celery)
@@ -124,7 +126,8 @@ are tracked in Phase 2+.
 
 - [x] Real embedding provider
 - [x] LLM response generation from retrieved sources
-- [ ] Document versioning
+- [x] Document versioning compatibility workflow
+- [ ] Document chunks linked directly to document versions
 - [ ] Reranking (cross-encoder or LLM-based)
 - [ ] Hybrid retrieval (keyword + vector + rerank)
 - [x] Initial confidence scoring refinement (score, level, and reason)

@@ -128,7 +128,34 @@ Expected result:
 - `embedding_provider` matches the configured provider.
 - `embedding_model` matches the configured model.
 
-### 4. Create a Ticket
+### 4. Upload a New Document Version
+
+In Knowledge Base, select the document detail and upload a different file in `Versions` using
+`Upload new version`.
+
+Expected result:
+
+- A new version appears in the version list, such as `v2`.
+- The document status moves to `Processing`, then `Indexed`.
+- The newest indexed version is marked `Active`.
+- The document detail shows the new version label and updated chunk count.
+
+You can also verify it in Postgres:
+
+```sql
+select
+  d.name,
+  d.version as current_version,
+  dv.version,
+  dv.status,
+  dv.is_active,
+  dv.chunk_count
+from documents d
+join document_versions dv on dv.document_id = d.id
+order by dv.created_at desc;
+```
+
+### 5. Create a Ticket
 
 Open http://localhost:3000/tickets.
 
@@ -153,7 +180,7 @@ Expected result:
 - Selecting it opens the detail panel.
 - The detail panel shows `Ready for response drafting`.
 
-### 5. Generate a Suggested Response
+### 6. Generate a Suggested Response
 
 Click `Suggest response`.
 
@@ -165,7 +192,7 @@ Expected result:
 - If no source is found, the UI shows a low-confidence/no-source warning instead of a technical
   error.
 
-### 6. Review the Suggestion
+### 7. Review the Suggestion
 
 Click `Approve` or `Reject`.
 
@@ -176,7 +203,7 @@ Expected result:
 - The latest suggestion remains visible.
 - Older suggestions appear in `Suggestion history` after more than one response is generated.
 
-### 7. Verify Suggested Responses in the Database
+### 8. Verify Suggested Responses in the Database
 
 ```sql
 select id, ticket_id, status, sources
