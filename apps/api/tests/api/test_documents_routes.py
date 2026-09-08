@@ -11,10 +11,12 @@ from supportops_api.api.dependencies import (
     get_document_processing_queue,
     get_document_repository,
     get_document_storage,
+    get_document_version_repository,
 )
 from supportops_api.application.documents import (
     DocumentNotFoundError,
     DocumentRepository,
+    DocumentVersionRepository,
     EnqueuedDocumentProcessing,
     StoredDocumentFile,
 )
@@ -23,6 +25,7 @@ from supportops_api.domain.documents import (
     DocumentChunk,
     DocumentStatus,
     DocumentType,
+    DocumentVersion,
     ProductArea,
 )
 from supportops_api.infrastructure.database import get_session
@@ -119,6 +122,28 @@ class InMemoryDocumentRepository(DocumentRepository):
         self.chunks[document_id] = chunks
 
 
+class InMemoryDocumentVersionRepository(DocumentVersionRepository):
+    def __init__(self) -> None:
+        self.versions: dict[UUID, DocumentVersion] = {}
+
+    async def add(self, version: DocumentVersion) -> None:
+        self.versions[version.id] = version
+
+    async def save(self, version: DocumentVersion) -> None:
+        self.versions[version.id] = version
+
+    async def get(self, version_id: UUID) -> DocumentVersion | None:
+        return self.versions.get(version_id)
+
+    async def list_for_document(self, document_id: UUID) -> list[DocumentVersion]:
+        return [version for version in self.versions.values() if version.document_id == document_id]
+
+    async def deactivate_all_for_document(self, document_id: UUID) -> None:
+        for version in self.versions.values():
+            if version.document_id == document_id:
+                version.deactivate()
+
+
 @pytest_asyncio.fixture
 async def api_client() -> AsyncIterator[
     tuple[
@@ -129,18 +154,20 @@ async def api_client() -> AsyncIterator[
     ]
 ]:
     repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
     storage = InMemoryDocumentStorage()
     processing_queue = FakeDocumentProcessingQueue(repository)
     session = FakeSession()
 
     app.dependency_overrides[get_document_repository] = lambda: repository
+    app.dependency_overrides[get_document_version_repository] = lambda: version_repository
     app.dependency_overrides[get_document_storage] = lambda: storage
     app.dependency_overrides[get_document_processing_queue] = lambda: processing_queue
     app.dependency_overrides[get_session] = lambda: session
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client, repository, storage, processing_queue, session
+        yield client, repository, version_repository, storage, processing_queue, session
 
     app.dependency_overrides.clear()
 
@@ -158,13 +185,32 @@ def create_document(repository: InMemoryDocumentRepository) -> Document:
     return document
 
 
+def create_indexed_version(
+    repository: InMemoryDocumentVersionRepository,
+    document_id: UUID,
+    version_label: str = "v2",
+) -> DocumentVersion:
+    version = DocumentVersion.create(
+        document_id=document_id,
+        version=version_label,
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=2048,
+        storage_key=f"documents/refund-policy/{version_label}.md",
+    )
+    version.start_processing()
+    version.mark_indexed(chunk_count=3)
+    repository.versions[version.id] = version
+    return version
+
+
 @pytest.mark.asyncio
 async def test_create_document(
     api_client: tuple[
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, _processing_queue, session = api_client
+    client, repository, _version_repository, _storage, _processing_queue, session = api_client
 
     response = await client.post(
         "/api/documents",
@@ -194,7 +240,7 @@ async def test_list_documents(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, _processing_queue, _session = api_client
+    client, repository, _version_repository, _storage, _processing_queue, _session = api_client
     document = create_document(repository)
 
     response = await client.get("/api/documents")
@@ -209,7 +255,7 @@ async def test_get_document(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, _processing_queue, _session = api_client
+    client, repository, _version_repository, _storage, _processing_queue, _session = api_client
     document = create_document(repository)
 
     response = await client.get(f"/api/documents/{document.id}")
@@ -224,7 +270,7 @@ async def test_get_document_returns_404(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, _repository, _storage, _processing_queue, _session = api_client
+    client, _repository, _version_repository, _storage, _processing_queue, _session = api_client
     document_id = uuid4()
 
     response = await client.get(f"/api/documents/{document_id}")
@@ -239,7 +285,7 @@ async def test_list_document_chunks(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, _processing_queue, _session = api_client
+    client, repository, _version_repository, _storage, _processing_queue, _session = api_client
     document = create_document(repository)
     chunk = DocumentChunk(
         document_id=document.id,
@@ -262,12 +308,49 @@ async def test_list_document_chunks(
 
 
 @pytest.mark.asyncio
+async def test_list_document_versions(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, version_repository, _storage, _processing_queue, _session = api_client
+    document = create_document(repository)
+    version = create_indexed_version(version_repository, document.id)
+
+    response = await client.get(f"/api/documents/{document.id}/versions")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body[0]["id"] == str(version.id)
+    assert body[0]["document_id"] == str(document.id)
+    assert body[0]["version"] == "v2"
+    assert body[0]["status"] == "indexed"
+    assert body[0]["is_active"] is False
+    assert body[0]["storage_key"] == "documents/refund-policy/v2.md"
+
+
+@pytest.mark.asyncio
+async def test_list_document_versions_returns_404(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, _repository, _version_repository, _storage, _processing_queue, _session = api_client
+    document_id = uuid4()
+
+    response = await client.get(f"/api/documents/{document_id}/versions")
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["document_id"] == str(document_id)
+
+
+@pytest.mark.asyncio
 async def test_list_document_chunks_returns_404(
     api_client: tuple[
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, _repository, _storage, _processing_queue, _session = api_client
+    client, _repository, _version_repository, _storage, _processing_queue, _session = api_client
     document_id = uuid4()
 
     response = await client.get(f"/api/documents/{document_id}/chunks")
@@ -282,7 +365,7 @@ async def test_activate_and_deactivate_document(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _storage, _processing_queue, session = api_client
+    client, repository, _version_repository, _storage, _processing_queue, session = api_client
     document = create_document(repository)
 
     deactivate_response = await client.post(f"/api/documents/{document.id}/deactivate")
@@ -296,12 +379,78 @@ async def test_activate_and_deactivate_document(
 
 
 @pytest.mark.asyncio
+async def test_activate_document_version(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, version_repository, _storage, _processing_queue, session = api_client
+    document = create_document(repository)
+    old_version = create_indexed_version(version_repository, document.id, "v1")
+    old_version.activate()
+    version = create_indexed_version(version_repository, document.id, "v2")
+
+    response = await client.post(f"/api/documents/{document.id}/versions/{version.id}/activate")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["id"] == str(version.id)
+    assert body["is_active"] is True
+    assert old_version.is_active is False
+    assert repository.documents[document.id].version == "v2"
+    assert repository.documents[document.id].storage_key == "documents/refund-policy/v2.md"
+    assert session.commit_count == 1
+
+
+@pytest.mark.asyncio
+async def test_activate_document_version_returns_404_for_wrong_version(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, _version_repository, _storage, _processing_queue, session = api_client
+    document = create_document(repository)
+    version_id = uuid4()
+
+    response = await client.post(f"/api/documents/{document.id}/versions/{version_id}/activate")
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["document_version_id"] == str(version_id)
+    assert session.commit_count == 0
+
+
+@pytest.mark.asyncio
+async def test_activate_document_version_returns_400_when_version_is_not_indexed(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, version_repository, _storage, _processing_queue, session = api_client
+    document = create_document(repository)
+    version = DocumentVersion.create(
+        document_id=document.id,
+        version="v2",
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=2048,
+        storage_key="documents/refund-policy/v2.md",
+    )
+    version_repository.versions[version.id] = version
+
+    response = await client.post(f"/api/documents/{document.id}/versions/{version.id}/activate")
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["message"] == "Only indexed document versions can be activated"
+    assert session.commit_count == 0
+
+
+@pytest.mark.asyncio
 async def test_upload_document(
     api_client: tuple[
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, storage, _processing_queue, session = api_client
+    client, repository, _version_repository, storage, _processing_queue, session = api_client
 
     response = await client.post(
         "/api/documents/upload",
@@ -337,7 +486,7 @@ async def test_upload_document_returns_400_for_empty_file(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, storage, _processing_queue, session = api_client
+    client, repository, _version_repository, storage, _processing_queue, session = api_client
 
     response = await client.post(
         "/api/documents/upload",
@@ -362,7 +511,7 @@ async def test_process_document(
         FakeSession,
     ],
 ) -> None:
-    client, repository, _storage, _processing_queue, session = api_client
+    client, repository, _version_repository, _storage, _processing_queue, session = api_client
     document = create_document(repository)
 
     response = await client.post(f"/api/documents/{document.id}/process")
@@ -387,7 +536,7 @@ async def test_process_document_returns_400_when_processing_fails(
         FakeSession,
     ],
 ) -> None:
-    client, repository, _storage, processing_queue, session = api_client
+    client, repository, _version_repository, _storage, processing_queue, session = api_client
     processing_queue.should_fail = True
     document = create_document(repository)
 

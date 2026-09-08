@@ -10,6 +10,7 @@ from supportops_api.domain.documents import (
     DocumentChunk,
     DocumentStatus,
     DocumentType,
+    DocumentVersion,
     ProductArea,
 )
 
@@ -89,6 +90,44 @@ class DocumentChunkResponse(BaseModel):
             embedding_provider=chunk.embedding_provider,
             embedding_model=chunk.embedding_model,
             created_at=chunk.created_at,
+        )
+
+
+class DocumentVersionResponse(BaseModel):
+    id: UUID
+    document_id: UUID
+    version: str
+    status: DocumentStatus
+    is_active: bool
+    source_file_name: str
+    storage_key: str
+    content_type: str
+    size_bytes: int
+    chunk_count: int
+    failure_reason: str | None
+    activated_at: datetime | None
+    last_processed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_domain(cls, version: DocumentVersion) -> DocumentVersionResponse:
+        return cls(
+            id=version.id,
+            document_id=version.document_id,
+            version=version.version,
+            status=version.status,
+            is_active=version.is_active,
+            source_file_name=version.source_file_name,
+            storage_key=version.storage_key,
+            content_type=version.content_type,
+            size_bytes=version.size_bytes,
+            chunk_count=version.chunk_count,
+            failure_reason=version.failure_reason,
+            activated_at=version.activated_at,
+            last_processed_at=version.last_processed_at,
+            created_at=version.created_at,
+            updated_at=version.updated_at,
         )
 
 

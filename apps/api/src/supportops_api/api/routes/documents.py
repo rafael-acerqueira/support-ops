@@ -9,15 +9,18 @@ from supportops_api.api.dependencies import (
     get_document_processing_queue,
     get_document_repository,
     get_document_storage,
+    get_document_version_repository,
 )
 from supportops_api.api.schemas import (
     CreateDocumentRequest,
     DocumentChunkResponse,
     DocumentProcessingResponse,
     DocumentResponse,
+    DocumentVersionResponse,
 )
 from supportops_api.application.documents import (
     ActivateDocument,
+    ActivateDocumentVersion,
     CreateDocument,
     CreateDocumentInput,
     DeactivateDocument,
@@ -25,8 +28,11 @@ from supportops_api.application.documents import (
     DocumentProcessingQueue,
     DocumentRepository,
     DocumentStorage,
+    DocumentVersionNotFoundError,
+    DocumentVersionRepository,
     GetDocument,
     ListDocumentChunks,
+    ListDocumentVersions,
     ListDocuments,
 )
 from supportops_api.domain.documents import DocumentType, ProductArea
@@ -39,6 +45,16 @@ def _not_found_error(error: DocumentNotFoundError) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail={"message": "Document not found", "document_id": str(error.document_id)},
+    )
+
+
+def _version_not_found_error(error: DocumentVersionNotFoundError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={
+            "message": "Document version not found",
+            "document_version_id": str(error.document_version_id),
+        },
     )
 
 
@@ -148,6 +164,49 @@ async def list_document_chunks(
         raise _not_found_error(error) from error
 
     return [DocumentChunkResponse.from_domain(chunk) for chunk in chunks]
+
+
+@router.get("/{document_id}/versions", response_model=list[DocumentVersionResponse])
+async def list_document_versions(
+    document_id: UUID,
+    repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
+) -> list[DocumentVersionResponse]:
+    try:
+        versions = await ListDocumentVersions(repository, version_repository).execute(document_id)
+    except DocumentNotFoundError as error:
+        raise _not_found_error(error) from error
+
+    return [DocumentVersionResponse.from_domain(version) for version in versions]
+
+
+@router.post(
+    "/{document_id}/versions/{version_id}/activate",
+    response_model=DocumentVersionResponse,
+)
+async def activate_document_version(
+    document_id: UUID,
+    version_id: UUID,
+    repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentVersionResponse:
+    try:
+        version = await ActivateDocumentVersion(repository, version_repository).execute(
+            document_id, version_id
+        )
+    except DocumentNotFoundError as error:
+        raise _not_found_error(error) from error
+    except DocumentVersionNotFoundError as error:
+        raise _version_not_found_error(error) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": str(error)},
+        ) from error
+
+    await session.commit()
+    return DocumentVersionResponse.from_domain(version)
 
 
 @router.post("/{document_id}/activate", response_model=DocumentResponse)
