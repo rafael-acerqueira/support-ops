@@ -536,8 +536,40 @@ export default function DocumentsPage() {
       );
       if (!response.ok) throw new Error('The API could not activate this version.');
 
-      setMessage('Document version activated.');
-      await Promise.all([loadDocuments(), loadDocumentVersions(selectedDocumentId)]);
+      const activatedVersion = (await response.json()) as DocumentVersion;
+      const processingVersion = {
+        ...activatedVersion,
+        status: 'processing' as DocumentStatus,
+      };
+
+      setSelectedDocumentVersions((currentVersions) =>
+        currentVersions.map((version) =>
+          version.id === activatedVersion.id
+            ? processingVersion
+            : { ...version, is_active: false }
+        )
+      );
+      setDocuments((currentDocuments) =>
+        currentDocuments.map((document) =>
+          document.id === selectedDocumentId
+            ? {
+                ...document,
+                version: activatedVersion.version,
+                source_file_name: activatedVersion.source_file_name,
+                storage_key: activatedVersion.storage_key,
+                content_type: activatedVersion.content_type,
+                size_bytes: activatedVersion.size_bytes,
+                status: 'processing',
+                chunk_count: 0,
+                failure_reason: null,
+                last_processed_at: null,
+              }
+            : document
+        )
+      );
+      setSelectedDocumentChunks([]);
+      watchDocument(selectedDocumentId);
+      setMessage('Document version activated. Processing queued.');
     } catch (activationError) {
       setError(
         activationError instanceof Error
