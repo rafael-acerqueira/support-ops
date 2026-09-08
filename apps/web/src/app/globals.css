@@ -575,7 +575,6 @@ tbody tr:last-child td {
 .detail-title-group,
 .detail-actions,
 .section-title-row,
-.version-row,
 .tag-list {
   display: flex;
   align-items: center;
@@ -826,24 +825,75 @@ tbody tr:last-child td {
   gap: 12px;
 }
 
-.version-row {
-  justify-content: space-between;
-  gap: 12px;
+.version-list {
+  display: grid;
+  gap: 10px;
   margin-top: 12px;
+}
+
+.version-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(220px, 1.5fr) auto;
+  gap: 12px;
+  align-items: center;
   border: 1px solid #475569;
   border-radius: 8px;
   background: #0f172a;
   padding: 12px;
 }
 
-.version-row span {
+.version-row.active {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.version-summary {
+  min-width: 0;
+}
+
+.version-summary span,
+.version-summary small {
+  display: block;
+}
+
+.version-summary span {
   color: #f1f5f9;
   font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   font-size: 13px;
   font-weight: 700;
 }
 
-.version-row strong {
+.version-summary small {
+  margin-top: 2px;
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.version-meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-meta > span:not(.status-badge) {
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.version-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.version-actions strong {
   border: 1px solid #10b981;
   border-radius: 16px;
   background: rgba(16, 185, 129, 0.2);
@@ -851,6 +901,15 @@ tbody tr:last-child td {
   padding: 4px 8px;
   font-size: 11px;
   line-height: 1.4;
+}
+
+.version-empty {
+  border: 1px dashed #475569;
+  border-radius: 8px;
+  color: #94a3b8;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .detail-empty {
@@ -1631,9 +1690,14 @@ tbody tr:last-child td {
   .ticket-create-panel,
   .document-layout .detail-grid,
   .embedding-grid,
+  .version-row,
   .tickets-layout .detail-grid,
   .ticket-controls {
     grid-template-columns: 1fr;
+  }
+
+  .version-actions {
+    justify-content: flex-start;
   }
 
   .upload-panel,

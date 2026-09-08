@@ -62,6 +62,24 @@ type DocumentChunk = {
   created_at: string;
 };
 
+type DocumentVersion = {
+  id: string;
+  document_id: string;
+  version: string;
+  status: DocumentStatus;
+  is_active: boolean;
+  source_file_name: string;
+  storage_key: string;
+  content_type: string;
+  size_bytes: number;
+  chunk_count: number;
+  failure_reason: string | null;
+  activated_at: string | null;
+  last_processed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 const documentTypes: Array<{ value: DocumentType; label: string }> = [
   { value: 'internal_policy', label: 'Internal policy' },
   { value: 'sla_policy', label: 'SLA policy' },
@@ -177,7 +195,10 @@ export default function DocumentsPage() {
   const [watchedDocumentIds, setWatchedDocumentIds] = useState<string[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [selectedDocumentChunks, setSelectedDocumentChunks] = useState<DocumentChunk[]>([]);
+  const [selectedDocumentVersions, setSelectedDocumentVersions] = useState<DocumentVersion[]>([]);
   const [isLoadingChunks, setIsLoadingChunks] = useState(false);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [busyVersionId, setBusyVersionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -237,11 +258,34 @@ export default function DocumentsPage() {
     }
   }, []);
 
+  const loadDocumentVersions = useCallback(async (documentId: string) => {
+    setIsLoadingVersions(true);
+
+    try {
+      const response = await fetch(`/api/documents/${documentId}/versions`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to load document versions.');
+
+      const versions = (await response.json()) as DocumentVersion[];
+      setSelectedDocumentVersions(versions);
+    } catch (versionError) {
+      setSelectedDocumentVersions([]);
+      setError(
+        versionError instanceof Error
+          ? versionError.message
+          : 'Unexpected error while loading document versions.'
+      );
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  }, []);
+
   const selectDocument = useCallback(
     (documentId: string) => {
       setSelectedDocumentId(documentId);
       setSelectedDocumentChunks([]);
+      setSelectedDocumentVersions([]);
       void loadDocumentChunks(documentId);
+      void loadDocumentVersions(documentId);
 
       window.requestAnimationFrame(() => {
         detailPanelRef.current?.scrollIntoView({
@@ -250,7 +294,7 @@ export default function DocumentsPage() {
         });
       });
     },
-    [loadDocumentChunks]
+    [loadDocumentChunks, loadDocumentVersions]
   );
 
   const loadDocuments = useCallback(async (options?: { silent?: boolean }) => {
@@ -266,6 +310,7 @@ export default function DocumentsPage() {
         if (!current || nextDocuments.some((document) => document.id === current)) return current;
 
         setSelectedDocumentChunks([]);
+        setSelectedDocumentVersions([]);
         return null;
       });
       setWatchedDocumentIds((current) =>
@@ -392,6 +437,33 @@ export default function DocumentsPage() {
       );
     } finally {
       setBusyDocumentId(null);
+    }
+  }
+
+  async function activateDocumentVersion(versionId: string) {
+    if (!selectedDocumentId) return;
+
+    setBusyVersionId(versionId);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(
+        `/api/documents/${selectedDocumentId}/versions/${versionId}/activate`,
+        { method: 'POST' }
+      );
+      if (!response.ok) throw new Error('The API could not activate this version.');
+
+      setMessage('Document version activated.');
+      await Promise.all([loadDocuments(), loadDocumentVersions(selectedDocumentId)]);
+    } catch (activationError) {
+      setError(
+        activationError instanceof Error
+          ? activationError.message
+          : 'Unexpected error while activating document version.'
+      );
+    } finally {
+      setBusyVersionId(null);
     }
   }
 
@@ -687,6 +759,7 @@ export default function DocumentsPage() {
                     onClick={() => {
                       setSelectedDocumentId(null);
                       setSelectedDocumentChunks([]);
+                      setSelectedDocumentVersions([]);
                     }}
                     title="Close detail"
                   >
@@ -853,17 +926,80 @@ export default function DocumentsPage() {
                     <div>
                       <h3 id="versions-title">Versions</h3>
                       <p>
-                        Version history will be available when document versioning is implemented.
+                        {isLoadingVersions
+                          ? 'Loading version history.'
+                          : `${selectedDocumentVersions.length} versions registered for this document.`}
                       </p>
                     </div>
-                    <button className="secondary-button compact" type="button" disabled>
+                    <button
+                      className="secondary-button compact"
+                      type="button"
+                      onClick={() => void loadDocumentVersions(selectedDocument.id)}
+                      disabled={isLoadingVersions}
+                    >
                       <History size={16} aria-hidden="true" />
-                      View versions
+                      Refresh
                     </button>
                   </div>
-                  <div className="version-row">
-                    <span>{selectedDocument.version}</span>
-                    <strong>Current</strong>
+
+                  <div className="version-list">
+                    {selectedDocumentVersions.map((version) => {
+                      const VersionStatusIcon = statusIcons[version.status];
+                      const canActivate = version.status === 'indexed' && !version.is_active;
+                      const isVersionBusy = busyVersionId === version.id;
+
+                      return (
+                        <div
+                          className={`version-row ${version.is_active ? 'active' : ''}`}
+                          key={version.id}
+                        >
+                          <div className="version-summary">
+                            <span>{version.version}</span>
+                            <small>{version.source_file_name}</small>
+                          </div>
+                          <div className="version-meta">
+                            <span className={`status-badge ${version.status}`}>
+                              <VersionStatusIcon
+                                className={version.status === 'processing' ? 'spin' : undefined}
+                                size={14}
+                                aria-hidden="true"
+                              />
+                              {statusLabels[version.status]}
+                            </span>
+                            <span>{version.chunk_count} chunks</span>
+                            <span>{formatDate(version.activated_at ?? version.updated_at)}</span>
+                          </div>
+                          <div className="version-actions">
+                            {version.is_active ? (
+                              <strong>Active</strong>
+                            ) : (
+                              <button
+                                className="secondary-button compact"
+                                type="button"
+                                onClick={() => void activateDocumentVersion(version.id)}
+                                disabled={!canActivate || isVersionBusy}
+                                title={
+                                  canActivate
+                                    ? 'Activate version'
+                                    : 'Only indexed versions can be activated'
+                                }
+                              >
+                                {isVersionBusy ? (
+                                  <Loader2 className="spin" size={16} aria-hidden="true" />
+                                ) : (
+                                  <CheckCircle size={16} aria-hidden="true" />
+                                )}
+                                Activate
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {!isLoadingVersions && selectedDocumentVersions.length === 0 && (
+                      <div className="version-empty">No versions registered yet.</div>
+                    )}
                   </div>
                 </section>
               </>
