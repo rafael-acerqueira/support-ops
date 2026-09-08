@@ -132,10 +132,10 @@ async def upload_document(
         )
     )
 
+    await session.commit()
     try:
         await processing_queue.enqueue(document.id)
     except ValueError as error:
-        await session.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"message": str(error)},
@@ -235,10 +235,10 @@ async def upload_document_version(
         )
     )
 
+    await session.commit()
     try:
         await processing_queue.enqueue(document.id)
     except ValueError as error:
-        await session.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"message": str(error)},
@@ -264,6 +264,7 @@ async def activate_document_version(
         version = await ActivateDocumentVersion(repository, version_repository).execute(
             document_id, version_id
         )
+        await session.commit()
         await processing_queue.enqueue(document_id)
     except DocumentNotFoundError as error:
         raise _not_found_error(error) from error

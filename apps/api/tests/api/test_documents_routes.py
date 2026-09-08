@@ -403,7 +403,7 @@ async def test_activate_document_version(
     assert repository.documents[document.id].storage_key == "documents/refund-policy/v2.md"
     assert processing_queue.enqueued_document_ids == [document.id]
     assert len(repository.chunks[document.id]) == 2
-    assert session.commit_count == 1
+    assert session.commit_count == 2
 
 
 @pytest.mark.asyncio
@@ -486,7 +486,7 @@ async def test_upload_document(
     assert repository.documents[document_id].status == DocumentStatus.INDEXED
     assert len(repository.chunks[document_id]) == 2
     assert storage.saved_files == [("enterprise-sla.md", "text/markdown", b"SLA policy content")]
-    assert session.commit_count == 1
+    assert session.commit_count == 2
 
 
 @pytest.mark.asyncio
@@ -539,7 +539,7 @@ async def test_upload_document_version(
     assert storage.saved_files == [
         ("refund-policy-v2.md", "text/markdown", b"Updated refund policy content")
     ]
-    assert session.commit_count == 1
+    assert session.commit_count == 2
 
 
 @pytest.mark.asyncio
