@@ -194,6 +194,61 @@ async def list_document_versions(
 
 
 @router.post(
+    "/{document_id}/versions/upload",
+    response_model=DocumentVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_document_version(
+    document_id: UUID,
+    file: UploadFile = File(...),
+    repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
+    storage: DocumentStorage = Depends(get_document_storage),
+    processing_queue: DocumentProcessingQueue = Depends(get_document_processing_queue),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentVersionResponse:
+    document = await repository.get(document_id)
+    if document is None:
+        raise _not_found_error(DocumentNotFoundError(document_id))
+
+    content_type = file.content_type or "application/octet-stream"
+
+    try:
+        stored_file = await storage.save(
+            file_name=file.filename or "document",
+            content_type=content_type,
+            content=file.file,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": str(error)},
+        ) from error
+
+    version = await CreateDocumentVersion(repository, version_repository).execute(
+        CreateDocumentVersionInput(
+            document_id=document.id,
+            source_file_name=stored_file.file_name,
+            content_type=stored_file.content_type,
+            size_bytes=stored_file.size_bytes,
+            storage_key=stored_file.storage_key,
+        )
+    )
+
+    try:
+        await processing_queue.enqueue(document.id)
+    except ValueError as error:
+        await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": str(error)},
+        ) from error
+
+    await session.commit()
+    return DocumentVersionResponse.from_domain(version)
+
+
+@router.post(
     "/{document_id}/versions/{version_id}/activate",
     response_model=DocumentVersionResponse,
 )

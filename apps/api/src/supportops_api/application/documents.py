@@ -135,11 +135,11 @@ class CreateDocumentInput:
 @dataclass(frozen=True)
 class CreateDocumentVersionInput:
     document_id: UUID
-    version: str
     source_file_name: str
     content_type: str
     size_bytes: int
     storage_key: str
+    version: str | None = None
 
 
 class CreateDocument:
@@ -176,15 +176,23 @@ class CreateDocumentVersion:
         if document is None:
             raise DocumentNotFoundError(data.document_id)
 
+        version_label = data.version
+        if version_label is None:
+            versions = await self._version_repository.list_for_document(document.id)
+            version_label = _next_version_label(versions)
+
         version = DocumentVersion.create(
             document_id=document.id,
-            version=data.version,
+            version=version_label,
             source_file_name=data.source_file_name,
             content_type=data.content_type,
             size_bytes=data.size_bytes,
             storage_key=data.storage_key,
         )
+        _sync_document_from_uploaded_version(document, version)
+
         await self._version_repository.add(version)
+        await self._document_repository.save(document)
         return version
 
 
@@ -393,3 +401,31 @@ def _sync_document_from_version(document: Document, version: DocumentVersion) ->
     document.failure_reason = version.failure_reason
     document.last_processed_at = version.last_processed_at
     document.updated_at = version.updated_at
+
+
+def _sync_document_from_uploaded_version(document: Document, version: DocumentVersion) -> None:
+    document.version = version.version
+    document.source_file_name = version.source_file_name
+    document.content_type = version.content_type
+    document.size_bytes = version.size_bytes
+    document.storage_key = version.storage_key
+    document.status = version.status
+    document.chunk_count = version.chunk_count
+    document.failure_reason = version.failure_reason
+    document.last_processed_at = version.last_processed_at
+    document.updated_at = version.updated_at
+
+
+def _next_version_label(versions: list[DocumentVersion]) -> str:
+    latest_number = 0
+
+    for version in versions:
+        if not version.version.startswith("v"):
+            continue
+
+        try:
+            latest_number = max(latest_number, int(version.version[1:]))
+        except ValueError:
+            continue
+
+    return f"v{latest_number + 1}"

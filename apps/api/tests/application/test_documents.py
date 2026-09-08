@@ -181,6 +181,32 @@ async def test_create_document_version_persists_uploaded_version() -> None:
     assert version.document_id == document.id
     assert version.version == "v2"
     assert version.status == DocumentStatus.UPLOADED
+    assert document_repository.documents[document.id].version == "v2"
+    assert document_repository.documents[document.id].storage_key == "documents/refund-policy/v2.md"
+
+
+@pytest.mark.asyncio
+async def test_create_document_version_uses_next_version_label_when_not_provided() -> None:
+    document_repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = create_uploaded_document()
+    await document_repository.add(document)
+    await version_repository.add(create_indexed_version(document.id, "v1"))
+    await version_repository.add(create_indexed_version(document.id, "v2"))
+
+    version = await CreateDocumentVersion(document_repository, version_repository).execute(
+        CreateDocumentVersionInput(
+            document_id=document.id,
+            source_file_name="refund-policy.md",
+            content_type="text/markdown",
+            size_bytes=4096,
+            storage_key="documents/refund-policy/v3.md",
+        )
+    )
+
+    assert version.version == "v3"
+    assert document_repository.documents[document.id].version == "v3"
+    assert document_repository.documents[document.id].status == DocumentStatus.UPLOADED
 
 
 @pytest.mark.asyncio

@@ -507,6 +507,59 @@ async def test_upload_document_returns_400_for_empty_file(
 
 
 @pytest.mark.asyncio
+async def test_upload_document_version(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, version_repository, storage, _processing_queue, session = api_client
+    document = create_document(repository)
+    current_version = create_indexed_version(version_repository, document.id, "v1")
+    current_version.activate()
+
+    response = await client.post(
+        f"/api/documents/{document.id}/versions/upload",
+        files={"file": ("refund-policy-v2.md", b"Updated refund policy content", "text/markdown")},
+    )
+
+    body = response.json()
+    assert response.status_code == 201
+    assert body["document_id"] == str(document.id)
+    assert body["version"] == "v2"
+    assert body["source_file_name"] == "refund-policy-v2.md"
+    assert body["storage_key"] == "fake/refund-policy-v2.md"
+    assert repository.documents[document.id].version == "v2"
+    assert repository.documents[document.id].storage_key == "fake/refund-policy-v2.md"
+    assert repository.documents[document.id].status == DocumentStatus.INDEXED
+    assert len(repository.chunks[document.id]) == 2
+    assert storage.saved_files == [
+        ("refund-policy-v2.md", "text/markdown", b"Updated refund policy content")
+    ]
+    assert session.commit_count == 1
+
+
+@pytest.mark.asyncio
+async def test_upload_document_version_returns_404_for_missing_document(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, _version_repository, storage, _processing_queue, session = api_client
+    document_id = uuid4()
+
+    response = await client.post(
+        f"/api/documents/{document_id}/versions/upload",
+        files={"file": ("refund-policy-v2.md", b"Updated refund policy content", "text/markdown")},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["document_id"] == str(document_id)
+    assert repository.documents == {}
+    assert storage.saved_files == []
+    assert session.commit_count == 0
+
+
+@pytest.mark.asyncio
 async def test_process_document(
     api_client: tuple[
         httpx.AsyncClient,
