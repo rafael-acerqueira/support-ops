@@ -10,6 +10,7 @@ from supportops_api.domain.documents import (
     DocumentChunk,
     DocumentStatus,
     DocumentType,
+    DocumentVersion,
     ProductArea,
 )
 from supportops_api.infrastructure.database import get_database_url
@@ -19,10 +20,13 @@ from supportops_api.infrastructure.persistence.document_repository import (
     _document_to_record,
     _record_to_chunk,
     _record_to_document,
+    _record_to_version,
+    _version_to_record,
 )
 from supportops_api.infrastructure.persistence.models import (
     DocumentChunkRecord,
     DocumentRecord,
+    DocumentVersionRecord,
     Vector,
 )
 
@@ -41,6 +45,21 @@ def create_indexed_document() -> Document:
     document.start_processing()
     document.mark_indexed(chunk_count=2)
     return document
+
+
+def create_indexed_document_version(document_id: UUID) -> DocumentVersion:
+    version = DocumentVersion.create(
+        document_id=document_id,
+        version="v2",
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=2048,
+        storage_key="documents/refund-policy/v2.md",
+    )
+    version.start_processing()
+    version.mark_indexed(chunk_count=3)
+    version.activate()
+    return version
 
 
 def create_test_embedding(value: float) -> tuple[float, ...]:
@@ -62,6 +81,24 @@ def test_document_record_roundtrip_preserves_domain_values() -> None:
     assert mapped_document.storage_key == "documents/refund-policy.md"
     assert mapped_document.chunk_count == 2
     assert mapped_document.last_processed_at == document.last_processed_at
+
+
+def test_document_version_record_roundtrip_preserves_domain_values() -> None:
+    document_id = uuid4()
+    version = create_indexed_document_version(document_id)
+
+    record = _version_to_record(version)
+    mapped_version = _record_to_version(record)
+
+    assert mapped_version.id == version.id
+    assert mapped_version.document_id == document_id
+    assert mapped_version.version == "v2"
+    assert mapped_version.status == DocumentStatus.INDEXED
+    assert mapped_version.is_active is True
+    assert mapped_version.storage_key == "documents/refund-policy/v2.md"
+    assert mapped_version.chunk_count == 3
+    assert mapped_version.activated_at == version.activated_at
+    assert mapped_version.last_processed_at == version.last_processed_at
 
 
 def test_chunk_record_roundtrip_preserves_domain_values() -> None:
