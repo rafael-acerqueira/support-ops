@@ -8,6 +8,7 @@ from supportops_api.domain.documents import (
     Document,
     DocumentChunk,
     DocumentType,
+    DocumentVersion,
     ProductArea,
 )
 
@@ -16,6 +17,12 @@ class DocumentNotFoundError(Exception):
     def __init__(self, document_id: UUID) -> None:
         super().__init__(f"Document not found: {document_id}")
         self.document_id = document_id
+
+
+class DocumentVersionNotFoundError(Exception):
+    def __init__(self, document_version_id: UUID) -> None:
+        super().__init__(f"Document version not found: {document_version_id}")
+        self.document_version_id = document_version_id
 
 
 class EmbeddingProviderError(Exception):
@@ -39,6 +46,23 @@ class DocumentRepository(Protocol):
         pass
 
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
+        pass
+
+
+class DocumentVersionRepository(Protocol):
+    async def add(self, version: DocumentVersion) -> None:
+        pass
+
+    async def save(self, version: DocumentVersion) -> None:
+        pass
+
+    async def get(self, version_id: UUID) -> DocumentVersion | None:
+        pass
+
+    async def list_for_document(self, document_id: UUID) -> list[DocumentVersion]:
+        pass
+
+    async def deactivate_all_for_document(self, document_id: UUID) -> None:
         pass
 
 
@@ -108,6 +132,16 @@ class CreateDocumentInput:
     storage_key: str | None = None
 
 
+@dataclass(frozen=True)
+class CreateDocumentVersionInput:
+    document_id: UUID
+    version: str
+    source_file_name: str
+    content_type: str
+    size_bytes: int
+    storage_key: str
+
+
 class CreateDocument:
     def __init__(self, repository: DocumentRepository) -> None:
         self._repository = repository
@@ -128,12 +162,55 @@ class CreateDocument:
         return document
 
 
+class CreateDocumentVersion:
+    def __init__(
+        self,
+        document_repository: DocumentRepository,
+        version_repository: DocumentVersionRepository,
+    ) -> None:
+        self._document_repository = document_repository
+        self._version_repository = version_repository
+
+    async def execute(self, data: CreateDocumentVersionInput) -> DocumentVersion:
+        document = await self._document_repository.get(data.document_id)
+        if document is None:
+            raise DocumentNotFoundError(data.document_id)
+
+        version = DocumentVersion.create(
+            document_id=document.id,
+            version=data.version,
+            source_file_name=data.source_file_name,
+            content_type=data.content_type,
+            size_bytes=data.size_bytes,
+            storage_key=data.storage_key,
+        )
+        await self._version_repository.add(version)
+        return version
+
+
 class ListDocuments:
     def __init__(self, repository: DocumentRepository) -> None:
         self._repository = repository
 
     async def execute(self) -> list[Document]:
         return await self._repository.list_all()
+
+
+class ListDocumentVersions:
+    def __init__(
+        self,
+        document_repository: DocumentRepository,
+        version_repository: DocumentVersionRepository,
+    ) -> None:
+        self._document_repository = document_repository
+        self._version_repository = version_repository
+
+    async def execute(self, document_id: UUID) -> list[DocumentVersion]:
+        document = await self._document_repository.get(document_id)
+        if document is None:
+            raise DocumentNotFoundError(document_id)
+
+        return await self._version_repository.list_for_document(document_id)
 
 
 class GetDocument:
@@ -146,6 +223,33 @@ class GetDocument:
             raise DocumentNotFoundError(document_id)
 
         return document
+
+
+class ActivateDocumentVersion:
+    def __init__(
+        self,
+        document_repository: DocumentRepository,
+        version_repository: DocumentVersionRepository,
+    ) -> None:
+        self._document_repository = document_repository
+        self._version_repository = version_repository
+
+    async def execute(self, document_id: UUID, version_id: UUID) -> DocumentVersion:
+        document = await self._document_repository.get(document_id)
+        if document is None:
+            raise DocumentNotFoundError(document_id)
+
+        version = await self._version_repository.get(version_id)
+        if version is None or version.document_id != document.id:
+            raise DocumentVersionNotFoundError(version_id)
+
+        await self._version_repository.deactivate_all_for_document(document.id)
+        version.activate()
+        _sync_document_from_version(document, version)
+
+        await self._version_repository.save(version)
+        await self._document_repository.save(document)
+        return version
 
 
 class ListDocumentChunks:
@@ -242,3 +346,16 @@ class ProcessDocument:
             )
 
         return embedded_chunks
+
+
+def _sync_document_from_version(document: Document, version: DocumentVersion) -> None:
+    document.version = version.version
+    document.source_file_name = version.source_file_name
+    document.content_type = version.content_type
+    document.size_bytes = version.size_bytes
+    document.storage_key = version.storage_key
+    document.status = version.status
+    document.chunk_count = version.chunk_count
+    document.failure_reason = version.failure_reason
+    document.last_processed_at = version.last_processed_at
+    document.updated_at = version.updated_at

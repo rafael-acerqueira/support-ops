@@ -160,6 +160,7 @@ class DocumentVersion:
     storage_key: str
     id: UUID = field(default_factory=uuid4)
     status: DocumentStatus = DocumentStatus.UPLOADED
+    is_active: bool = False
     chunk_count: int = 0
     failure_reason: str | None = None
     created_at: datetime = field(default_factory=_utcnow)
@@ -232,9 +233,17 @@ class DocumentVersion:
         self.updated_at = _utcnow()
 
     def activate(self) -> None:
+        if self.status != DocumentStatus.INDEXED:
+            raise ValueError("Only indexed document versions can be activated")
+
         now = _utcnow()
+        self.is_active = True
         self.activated_at = now
         self.updated_at = now
+
+    def deactivate(self) -> None:
+        self.is_active = False
+        self.updated_at = _utcnow()
 
 
 @dataclass(frozen=True)

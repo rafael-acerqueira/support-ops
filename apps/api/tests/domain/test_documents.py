@@ -120,6 +120,7 @@ def test_document_version_starts_uploaded_and_trims_file_metadata() -> None:
     assert version.content_type == "text/markdown"
     assert version.storage_key == "documents/refund-policy/v2.md"
     assert version.status == DocumentStatus.UPLOADED
+    assert version.is_active is False
     assert version.chunk_count == 0
     assert version.activated_at is None
 
@@ -142,7 +143,11 @@ def test_document_version_moves_through_processing_and_indexed_states() -> None:
     assert version.chunk_count == 5
     assert version.failure_reason is None
     assert version.last_processed_at is not None
+    assert version.is_active is True
     assert version.activated_at is not None
+
+    version.deactivate()
+    assert version.is_active is False
 
 
 def test_document_version_requires_chunks_to_be_marked_indexed() -> None:
@@ -157,6 +162,20 @@ def test_document_version_requires_chunks_to_be_marked_indexed() -> None:
 
     with pytest.raises(ValueError, match="at least one chunk"):
         version.mark_indexed(chunk_count=0)
+
+
+def test_document_version_requires_indexed_status_to_activate() -> None:
+    version = DocumentVersion.create(
+        document_id=uuid4(),
+        version="v1",
+        source_file_name="sla.md",
+        content_type="text/markdown",
+        size_bytes=512,
+        storage_key="documents/sla/v1.md",
+    )
+
+    with pytest.raises(ValueError, match="Only indexed"):
+        version.activate()
 
 
 def test_document_version_records_failure_reason() -> None:

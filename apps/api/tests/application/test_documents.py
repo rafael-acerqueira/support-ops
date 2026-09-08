@@ -4,13 +4,18 @@ import pytest
 
 from supportops_api.application.documents import (
     ActivateDocument,
+    ActivateDocumentVersion,
     CreateDocument,
     CreateDocumentInput,
+    CreateDocumentVersion,
+    CreateDocumentVersionInput,
     DeactivateDocument,
     DocumentNotFoundError,
+    DocumentVersionNotFoundError,
     GeneratedEmbedding,
     GetDocument,
     ListDocumentChunks,
+    ListDocumentVersions,
     ListDocuments,
     ProcessDocument,
 )
@@ -19,6 +24,7 @@ from supportops_api.domain.documents import (
     DocumentChunk,
     DocumentStatus,
     DocumentType,
+    DocumentVersion,
     ProductArea,
 )
 
@@ -47,6 +53,30 @@ class InMemoryDocumentRepository:
 
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
         self.chunks[document_id] = chunks
+
+
+class InMemoryDocumentVersionRepository:
+    def __init__(self) -> None:
+        self.versions: dict[UUID, DocumentVersion] = {}
+        self.saved_versions: list[DocumentVersion] = []
+
+    async def add(self, version: DocumentVersion) -> None:
+        self.versions[version.id] = version
+
+    async def save(self, version: DocumentVersion) -> None:
+        self.versions[version.id] = version
+        self.saved_versions.append(version)
+
+    async def get(self, version_id: UUID) -> DocumentVersion | None:
+        return self.versions.get(version_id)
+
+    async def list_for_document(self, document_id: UUID) -> list[DocumentVersion]:
+        return [version for version in self.versions.values() if version.document_id == document_id]
+
+    async def deactivate_all_for_document(self, document_id: UUID) -> None:
+        for version in self.versions.values():
+            if version.document_id == document_id:
+                version.deactivate()
 
 
 class SuccessfulDocumentProcessor:
@@ -91,6 +121,20 @@ def create_uploaded_document() -> Document:
     )
 
 
+def create_indexed_version(document_id: UUID, version: str = "v2") -> DocumentVersion:
+    document_version = DocumentVersion.create(
+        document_id=document_id,
+        version=version,
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=2048,
+        storage_key=f"documents/refund-policy/{version}.md",
+    )
+    document_version.start_processing()
+    document_version.mark_indexed(chunk_count=3)
+    return document_version
+
+
 @pytest.mark.asyncio
 async def test_create_document_persists_uploaded_document() -> None:
     repository = InMemoryDocumentRepository()
@@ -116,6 +160,48 @@ async def test_create_document_persists_uploaded_document() -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_document_version_persists_uploaded_version() -> None:
+    document_repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = create_uploaded_document()
+    await document_repository.add(document)
+
+    version = await CreateDocumentVersion(document_repository, version_repository).execute(
+        CreateDocumentVersionInput(
+            document_id=document.id,
+            version="v2",
+            source_file_name="refund-policy.md",
+            content_type="text/markdown",
+            size_bytes=2048,
+            storage_key="documents/refund-policy/v2.md",
+        )
+    )
+
+    assert version_repository.versions[version.id] == version
+    assert version.document_id == document.id
+    assert version.version == "v2"
+    assert version.status == DocumentStatus.UPLOADED
+
+
+@pytest.mark.asyncio
+async def test_create_document_version_requires_existing_document() -> None:
+    with pytest.raises(DocumentNotFoundError):
+        await CreateDocumentVersion(
+            InMemoryDocumentRepository(),
+            InMemoryDocumentVersionRepository(),
+        ).execute(
+            CreateDocumentVersionInput(
+                document_id=uuid4(),
+                version="v2",
+                source_file_name="refund-policy.md",
+                content_type="text/markdown",
+                size_bytes=2048,
+                storage_key="documents/refund-policy/v2.md",
+            )
+        )
+
+
+@pytest.mark.asyncio
 async def test_list_documents_returns_all_documents() -> None:
     repository = InMemoryDocumentRepository()
     document = create_uploaded_document()
@@ -127,6 +213,22 @@ async def test_list_documents_returns_all_documents() -> None:
 
 
 @pytest.mark.asyncio
+async def test_list_document_versions_returns_versions_for_document() -> None:
+    document_repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = create_uploaded_document()
+    version = create_indexed_version(document.id)
+    await document_repository.add(document)
+    await version_repository.add(version)
+
+    versions = await ListDocumentVersions(document_repository, version_repository).execute(
+        document.id
+    )
+
+    assert versions == [version]
+
+
+@pytest.mark.asyncio
 async def test_get_document_raises_when_document_does_not_exist() -> None:
     repository = InMemoryDocumentRepository()
     document_id = uuid4()
@@ -135,6 +237,48 @@ async def test_get_document_raises_when_document_does_not_exist() -> None:
         await GetDocument(repository).execute(document_id)
 
     assert error.value.document_id == document_id
+
+
+@pytest.mark.asyncio
+async def test_activate_document_version_updates_active_version_and_document_snapshot() -> None:
+    document_repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = create_uploaded_document()
+    old_version = create_indexed_version(document.id, "v1")
+    old_version.activate()
+    new_version = create_indexed_version(document.id, "v2")
+    await document_repository.add(document)
+    await version_repository.add(old_version)
+    await version_repository.add(new_version)
+
+    activated = await ActivateDocumentVersion(document_repository, version_repository).execute(
+        document.id, new_version.id
+    )
+
+    assert activated == new_version
+    assert activated.is_active is True
+    assert old_version.is_active is False
+    assert document.version == "v2"
+    assert document.storage_key == "documents/refund-policy/v2.md"
+    assert document.status == DocumentStatus.INDEXED
+    assert document.chunk_count == 3
+    assert version_repository.saved_versions == [new_version]
+    assert document_repository.saved_documents == [document]
+
+
+@pytest.mark.asyncio
+async def test_activate_document_version_rejects_version_from_another_document() -> None:
+    document_repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = create_uploaded_document()
+    version = create_indexed_version(uuid4())
+    await document_repository.add(document)
+    await version_repository.add(version)
+
+    with pytest.raises(DocumentVersionNotFoundError):
+        await ActivateDocumentVersion(document_repository, version_repository).execute(
+            document.id, version.id
+        )
 
 
 @pytest.mark.asyncio
