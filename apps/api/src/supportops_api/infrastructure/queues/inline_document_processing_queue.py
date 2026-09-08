@@ -6,6 +6,7 @@ from supportops_api.application.documents import (
     DocumentProcessingQueue,
     DocumentProcessor,
     DocumentRepository,
+    DocumentVersionRepository,
     EmbeddingGenerator,
     EnqueuedDocumentProcessing,
     ProcessDocument,
@@ -18,16 +19,19 @@ class InlineDocumentProcessingQueue(DocumentProcessingQueue):
         repository: DocumentRepository,
         processor: DocumentProcessor,
         embedding_generator: EmbeddingGenerator | None = None,
+        version_repository: DocumentVersionRepository | None = None,
     ) -> None:
         self._repository = repository
         self._processor = processor
         self._embedding_generator = embedding_generator
+        self._version_repository = version_repository
 
     async def enqueue(self, document_id: UUID) -> EnqueuedDocumentProcessing:
         await ProcessDocument(
             self._repository,
             self._processor,
             self._embedding_generator,
+            self._version_repository,
         ).execute(document_id)
         return EnqueuedDocumentProcessing(
             document_id=document_id,

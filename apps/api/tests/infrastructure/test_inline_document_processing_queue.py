@@ -8,6 +8,7 @@ from supportops_api.domain.documents import (
     DocumentChunk,
     DocumentStatus,
     DocumentType,
+    DocumentVersion,
     ProductArea,
 )
 from supportops_api.infrastructure.queues import InlineDocumentProcessingQueue
@@ -32,6 +33,28 @@ class InMemoryDocumentRepository:
 
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
         self.chunks[document_id] = chunks
+
+
+class InMemoryDocumentVersionRepository:
+    def __init__(self) -> None:
+        self.versions: dict[UUID, DocumentVersion] = {}
+
+    async def add(self, version: DocumentVersion) -> None:
+        self.versions[version.id] = version
+
+    async def save(self, version: DocumentVersion) -> None:
+        self.versions[version.id] = version
+
+    async def get(self, version_id: UUID) -> DocumentVersion | None:
+        return self.versions.get(version_id)
+
+    async def list_for_document(self, document_id: UUID) -> list[DocumentVersion]:
+        return [version for version in self.versions.values() if version.document_id == document_id]
+
+    async def deactivate_all_for_document(self, document_id: UUID) -> None:
+        for version in self.versions.values():
+            if version.document_id == document_id:
+                version.deactivate()
 
 
 class FakeDocumentProcessor:
@@ -86,3 +109,30 @@ async def test_inline_document_processing_queue_can_generate_embeddings() -> Non
     ).enqueue(document.id)
 
     assert repository.chunks[document.id][0].embedding == (0.4, 0.8)
+
+
+@pytest.mark.asyncio
+async def test_inline_document_processing_queue_syncs_current_version() -> None:
+    repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = create_document()
+    version = DocumentVersion.create(
+        document_id=document.id,
+        version=document.version,
+        source_file_name=document.source_file_name,
+        content_type=document.content_type,
+        size_bytes=document.size_bytes,
+        storage_key=document.storage_key or "",
+    )
+    await repository.add(document)
+    await version_repository.add(version)
+
+    await InlineDocumentProcessingQueue(
+        repository,
+        FakeDocumentProcessor(),
+        version_repository=version_repository,
+    ).enqueue(document.id)
+
+    assert version.status == DocumentStatus.INDEXED
+    assert version.is_active is True
+    assert version.chunk_count == 1
