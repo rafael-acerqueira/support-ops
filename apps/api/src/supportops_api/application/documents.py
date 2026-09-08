@@ -298,10 +298,12 @@ class ProcessDocument:
         repository: DocumentRepository,
         processor: DocumentProcessor,
         embedding_generator: EmbeddingGenerator | None = None,
+        version_repository: DocumentVersionRepository | None = None,
     ) -> None:
         self._repository = repository
         self._processor = processor
         self._embedding_generator = embedding_generator
+        self._version_repository = version_repository
 
     async def execute(self, document_id: UUID) -> Document:
         document = await self._repository.get(document_id)
@@ -316,8 +318,10 @@ class ProcessDocument:
             chunks = await self._generate_embeddings(chunks)
             document.mark_indexed(chunk_count=len(chunks))
             await self._repository.replace_chunks(document.id, chunks)
+            await self._sync_processed_version(document)
         except Exception as exc:
             document.mark_failed(str(exc))
+            await self._sync_failed_version(document)
             raise
         finally:
             await self._repository.save(document)
@@ -346,6 +350,36 @@ class ProcessDocument:
             )
 
         return embedded_chunks
+
+    async def _sync_processed_version(self, document: Document) -> None:
+        version = await self._find_current_version(document)
+        if version is None:
+            return
+
+        version.start_processing()
+        version.mark_indexed(chunk_count=document.chunk_count)
+        await self._version_repository.deactivate_all_for_document(document.id)
+        version.activate()
+        await self._version_repository.save(version)
+
+    async def _sync_failed_version(self, document: Document) -> None:
+        version = await self._find_current_version(document)
+        if version is None or document.failure_reason is None:
+            return
+
+        version.mark_failed(document.failure_reason)
+        await self._version_repository.save(version)
+
+    async def _find_current_version(self, document: Document) -> DocumentVersion | None:
+        if self._version_repository is None:
+            return None
+
+        versions = await self._version_repository.list_for_document(document.id)
+        for version in versions:
+            if version.version == document.version and version.storage_key == document.storage_key:
+                return version
+
+        return None
 
 
 def _sync_document_from_version(document: Document, version: DocumentVersion) -> None:

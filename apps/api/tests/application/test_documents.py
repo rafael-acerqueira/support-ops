@@ -323,6 +323,43 @@ async def test_process_document_replaces_chunks_and_marks_document_indexed() -> 
 
 
 @pytest.mark.asyncio
+async def test_process_document_syncs_current_version_when_version_repository_is_provided() -> None:
+    repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = Document.create(
+        name="Refund Policy",
+        document_type=DocumentType.INTERNAL_POLICY,
+        product_area=ProductArea.BILLING,
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=1024,
+        storage_key="documents/refund-policy/v1.md",
+    )
+    version = DocumentVersion.create(
+        document_id=document.id,
+        version=document.version,
+        source_file_name=document.source_file_name,
+        content_type=document.content_type,
+        size_bytes=document.size_bytes,
+        storage_key=document.storage_key or "",
+    )
+    await repository.add(document)
+    await version_repository.add(version)
+
+    await ProcessDocument(
+        repository,
+        SuccessfulDocumentProcessor(),
+        version_repository=version_repository,
+    ).execute(document.id)
+
+    assert version.status == DocumentStatus.INDEXED
+    assert version.is_active is True
+    assert version.chunk_count == 2
+    assert version.last_processed_at is not None
+    assert version_repository.saved_versions == [version]
+
+
+@pytest.mark.asyncio
 async def test_process_document_generates_chunk_embeddings_when_generator_is_provided() -> None:
     repository = InMemoryDocumentRepository()
     document = create_uploaded_document()

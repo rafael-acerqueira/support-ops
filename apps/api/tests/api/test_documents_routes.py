@@ -450,7 +450,7 @@ async def test_upload_document(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, _version_repository, storage, _processing_queue, session = api_client
+    client, repository, version_repository, storage, _processing_queue, session = api_client
 
     response = await client.post(
         "/api/documents/upload",
@@ -474,6 +474,11 @@ async def test_upload_document(
     assert body["chunk_count"] == 2
     document_id = UUID(body["id"])
     assert document_id in repository.documents
+    versions = await version_repository.list_for_document(document_id)
+    assert len(versions) == 1
+    assert versions[0].document_id == document_id
+    assert versions[0].version == "v1"
+    assert versions[0].storage_key == "fake/enterprise-sla.md"
     assert repository.documents[document_id].status == DocumentStatus.INDEXED
     assert len(repository.chunks[document_id]) == 2
     assert storage.saved_files == [("enterprise-sla.md", "text/markdown", b"SLA policy content")]

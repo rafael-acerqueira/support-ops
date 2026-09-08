@@ -23,6 +23,8 @@ from supportops_api.application.documents import (
     ActivateDocumentVersion,
     CreateDocument,
     CreateDocumentInput,
+    CreateDocumentVersion,
+    CreateDocumentVersionInput,
     DeactivateDocument,
     DocumentNotFoundError,
     DocumentProcessingQueue,
@@ -88,6 +90,7 @@ async def upload_document(
     tags: list[str] = Form(default_factory=list),
     file: UploadFile = File(...),
     repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
     storage: DocumentStorage = Depends(get_document_storage),
     processing_queue: DocumentProcessingQueue = Depends(get_document_processing_queue),
     session: AsyncSession = Depends(get_session),
@@ -115,6 +118,16 @@ async def upload_document(
             content_type=stored_file.content_type,
             size_bytes=stored_file.size_bytes,
             tags=tuple(tags),
+            storage_key=stored_file.storage_key,
+        )
+    )
+    await CreateDocumentVersion(repository, version_repository).execute(
+        CreateDocumentVersionInput(
+            document_id=document.id,
+            version=document.version,
+            source_file_name=stored_file.file_name,
+            content_type=stored_file.content_type,
+            size_bytes=stored_file.size_bytes,
             storage_key=stored_file.storage_key,
         )
     )
