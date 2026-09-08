@@ -35,8 +35,10 @@ class FakeDocumentProcessingQueue:
     def __init__(self, repository: InMemoryDocumentRepository) -> None:
         self._repository = repository
         self.should_fail = False
+        self.enqueued_document_ids: list[UUID] = []
 
     async def enqueue(self, document_id: UUID) -> EnqueuedDocumentProcessing:
+        self.enqueued_document_ids.append(document_id)
         document = await self._repository.get(document_id)
         if document is None:
             raise DocumentNotFoundError(document_id)
@@ -384,7 +386,7 @@ async def test_activate_document_version(
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
     ],
 ) -> None:
-    client, repository, version_repository, _storage, _processing_queue, session = api_client
+    client, repository, version_repository, _storage, processing_queue, session = api_client
     document = create_document(repository)
     old_version = create_indexed_version(version_repository, document.id, "v1")
     old_version.activate()
@@ -399,6 +401,8 @@ async def test_activate_document_version(
     assert old_version.is_active is False
     assert repository.documents[document.id].version == "v2"
     assert repository.documents[document.id].storage_key == "documents/refund-policy/v2.md"
+    assert processing_queue.enqueued_document_ids == [document.id]
+    assert len(repository.chunks[document.id]) == 2
     assert session.commit_count == 1
 
 

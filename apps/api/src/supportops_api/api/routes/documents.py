@@ -257,12 +257,14 @@ async def activate_document_version(
     version_id: UUID,
     repository: DocumentRepository = Depends(get_document_repository),
     version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
+    processing_queue: DocumentProcessingQueue = Depends(get_document_processing_queue),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentVersionResponse:
     try:
         version = await ActivateDocumentVersion(repository, version_repository).execute(
             document_id, version_id
         )
+        await processing_queue.enqueue(document_id)
     except DocumentNotFoundError as error:
         raise _not_found_error(error) from error
     except DocumentVersionNotFoundError as error:
