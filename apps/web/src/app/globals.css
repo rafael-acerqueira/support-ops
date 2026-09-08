@@ -831,6 +831,27 @@ tbody tr:last-child td {
   margin-top: 12px;
 }
 
+.version-upload {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.compact-file-field {
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.compact-file-field span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .version-row {
   display: grid;
   grid-template-columns: minmax(160px, 1fr) minmax(220px, 1.5fr) auto;
@@ -1690,6 +1711,7 @@ tbody tr:last-child td {
   .ticket-create-panel,
   .document-layout .detail-grid,
   .embedding-grid,
+  .version-upload,
   .version-row,
   .tickets-layout .detail-grid,
   .ticket-controls {

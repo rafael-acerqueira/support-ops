@@ -189,8 +189,10 @@ export default function DocumentsPage() {
   const [productArea, setProductArea] = useState<ProductArea>('support');
   const [tags, setTags] = useState('enterprise, sla');
   const [file, setFile] = useState<File | null>(null);
+  const [versionFile, setVersionFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingVersion, setIsUploadingVersion] = useState(false);
   const [busyDocumentId, setBusyDocumentId] = useState<string | null>(null);
   const [watchedDocumentIds, setWatchedDocumentIds] = useState<string[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
@@ -335,13 +337,21 @@ export default function DocumentsPage() {
 
     const intervalId = window.setInterval(() => {
       void loadDocuments({ silent: true });
+      if (selectedDocumentId) {
+        void loadDocumentVersions(selectedDocumentId);
+        void loadDocumentChunks(selectedDocumentId);
+      }
     }, 1500);
 
     return () => window.clearInterval(intervalId);
-  }, [isPolling, loadDocuments]);
+  }, [isPolling, loadDocumentChunks, loadDocumentVersions, loadDocuments, selectedDocumentId]);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     setFile(event.target.files?.[0] ?? null);
+  }
+
+  function handleVersionFileChange(event: ChangeEvent<HTMLInputElement>) {
+    setVersionFile(event.target.files?.[0] ?? null);
   }
 
   async function handleUpload(event: FormEvent<HTMLFormElement>) {
@@ -385,6 +395,10 @@ export default function DocumentsPage() {
         ...currentDocuments.filter((document) => document.id !== uploadedDocument.id),
       ]);
       setSelectedDocumentId(uploadedDocument.id);
+      setSelectedDocumentChunks([]);
+      setSelectedDocumentVersions([]);
+      void loadDocumentChunks(uploadedDocument.id);
+      void loadDocumentVersions(uploadedDocument.id);
       if (!['indexed', 'failed'].includes(uploadedDocument.status))
         watchDocument(uploadedDocument.id);
 
@@ -396,6 +410,74 @@ export default function DocumentsPage() {
       );
     } finally {
       setIsUploading(false);
+    }
+  }
+
+  async function handleVersionUpload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedDocumentId) return;
+
+    if (!versionFile) {
+      setError('Select a file to upload as a new version.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', versionFile);
+
+    setIsUploadingVersion(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/documents/${selectedDocumentId}/versions/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('The API rejected the version upload.');
+
+      const uploadedVersion = (await response.json()) as DocumentVersion;
+      const visibleVersion =
+        uploadedVersion.status === 'uploaded'
+          ? { ...uploadedVersion, status: 'processing' as DocumentStatus }
+          : uploadedVersion;
+
+      setSelectedDocumentVersions((currentVersions) => [
+        visibleVersion,
+        ...currentVersions.filter((version) => version.id !== uploadedVersion.id),
+      ]);
+      setDocuments((currentDocuments) =>
+        currentDocuments.map((document) =>
+          document.id === selectedDocumentId
+            ? {
+                ...document,
+                version: uploadedVersion.version,
+                source_file_name: uploadedVersion.source_file_name,
+                storage_key: uploadedVersion.storage_key,
+                content_type: uploadedVersion.content_type,
+                size_bytes: uploadedVersion.size_bytes,
+                status: 'processing',
+                chunk_count: 0,
+                failure_reason: null,
+                last_processed_at: null,
+              }
+            : document
+        )
+      );
+      watchDocument(selectedDocumentId);
+      setSelectedDocumentChunks([]);
+      setVersionFile(null);
+      setMessage('Document version uploaded. Processing queued.');
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : 'Unexpected error during version upload.'
+      );
+    } finally {
+      setIsUploadingVersion(false);
     }
   }
 
@@ -760,6 +842,7 @@ export default function DocumentsPage() {
                       setSelectedDocumentId(null);
                       setSelectedDocumentChunks([]);
                       setSelectedDocumentVersions([]);
+                      setVersionFile(null);
                     }}
                     title="Close detail"
                   >
@@ -941,6 +1024,26 @@ export default function DocumentsPage() {
                       Refresh
                     </button>
                   </div>
+
+                  <form className="version-upload" onSubmit={handleVersionUpload}>
+                    <label className="file-field compact-file-field">
+                      <FileText size={16} aria-hidden="true" />
+                      <span>{versionFile ? versionFile.name : 'Select new version file'}</span>
+                      <input type="file" onChange={handleVersionFileChange} />
+                    </label>
+                    <button
+                      className="primary-button compact"
+                      type="submit"
+                      disabled={isUploadingVersion || !versionFile}
+                    >
+                      {isUploadingVersion ? (
+                        <Loader2 className="spin" size={16} aria-hidden="true" />
+                      ) : (
+                        <Upload size={16} aria-hidden="true" />
+                      )}
+                      Upload new version
+                    </button>
+                  </form>
 
                   <div className="version-list">
                     {selectedDocumentVersions.map((version) => {
