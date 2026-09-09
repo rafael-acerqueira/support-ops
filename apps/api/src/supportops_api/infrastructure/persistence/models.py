@@ -167,6 +167,7 @@ class DocumentVersionRecord(Base):
     )
 
     document: Mapped[DocumentRecord] = relationship(back_populates="versions")
+    chunks: Mapped[list[DocumentChunkRecord]] = relationship(back_populates="document_version")
 
 
 class DocumentChunkRecord(Base):
@@ -175,6 +176,11 @@ class DocumentChunkRecord(Base):
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True)
     document_id: Mapped[UUID] = mapped_column(
         PostgresUUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    document_version_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("document_versions.id", ondelete="SET NULL"),
+        nullable=True,
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -189,3 +195,4 @@ class DocumentChunkRecord(Base):
     )
 
     document: Mapped[DocumentRecord] = relationship(back_populates="chunks")
+    document_version: Mapped[DocumentVersionRecord | None] = relationship(back_populates="chunks")
