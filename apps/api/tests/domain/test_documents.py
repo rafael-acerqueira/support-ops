@@ -212,9 +212,16 @@ def test_document_chunk_requires_non_empty_content() -> None:
 
 
 def test_document_chunk_trims_content() -> None:
-    chunk = DocumentChunk(document_id=uuid4(), chunk_index=1, content="  SLA response window  ")
+    version_id = uuid4()
+    chunk = DocumentChunk(
+        document_id=uuid4(),
+        document_version_id=version_id,
+        chunk_index=1,
+        content="  SLA response window  ",
+    )
 
     assert chunk.content == "SLA response window"
+    assert chunk.document_version_id == version_id
 
 
 def test_document_chunk_preserves_embedding_values() -> None:

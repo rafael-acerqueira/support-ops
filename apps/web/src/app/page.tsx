@@ -53,6 +53,7 @@ type KnowledgeDocument = {
 type DocumentChunk = {
   id: string;
   document_id: string;
+  document_version_id: string | null;
   chunk_index: number;
   content: string;
   metadata: Record<string, unknown>;

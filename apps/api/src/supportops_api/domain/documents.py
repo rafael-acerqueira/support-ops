@@ -251,6 +251,7 @@ class DocumentChunk:
     document_id: UUID
     chunk_index: int
     content: str
+    document_version_id: UUID | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     embedding: tuple[float, ...] | None = None
     embedding_provider: str | None = None

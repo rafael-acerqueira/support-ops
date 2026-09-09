@@ -383,6 +383,10 @@ async def test_process_document_syncs_current_version_when_version_repository_is
     assert version.is_active is True
     assert version.chunk_count == 2
     assert version.last_processed_at is not None
+    assert [chunk.document_version_id for chunk in repository.chunks[document.id]] == [
+        version.id,
+        version.id,
+    ]
     assert version_repository.saved_versions[0].status == DocumentStatus.PROCESSING
     assert version_repository.saved_versions[1].status == DocumentStatus.INDEXED
     assert len(version_repository.saved_versions) == 2

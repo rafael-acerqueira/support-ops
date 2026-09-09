@@ -320,10 +320,11 @@ class ProcessDocument:
 
         document.start_processing()
         await self._repository.save(document)
-        await self._sync_processing_version(document)
+        current_version = await self._sync_processing_version(document)
 
         try:
             chunks = await self._processor.process(document)
+            chunks = _attach_chunks_to_version(chunks, current_version)
             chunks = await self._generate_embeddings(chunks)
             document.mark_indexed(chunk_count=len(chunks))
             await self._repository.replace_chunks(document.id, chunks)
@@ -337,13 +338,14 @@ class ProcessDocument:
 
         return document
 
-    async def _sync_processing_version(self, document: Document) -> None:
+    async def _sync_processing_version(self, document: Document) -> DocumentVersion | None:
         version = await self._find_current_version(document)
         if version is None:
-            return
+            return None
 
         version.start_processing()
         await self._version_repository.save(version)
+        return version
 
     async def _generate_embeddings(self, chunks: list[DocumentChunk]) -> list[DocumentChunk]:
         if self._embedding_generator is None:
@@ -356,6 +358,7 @@ class ProcessDocument:
                 DocumentChunk(
                     id=chunk.id,
                     document_id=chunk.document_id,
+                    document_version_id=chunk.document_version_id,
                     chunk_index=chunk.chunk_index,
                     content=chunk.content,
                     metadata=chunk.metadata,
@@ -422,6 +425,30 @@ def _sync_document_from_uploaded_version(document: Document, version: DocumentVe
     document.failure_reason = version.failure_reason
     document.last_processed_at = version.last_processed_at
     document.updated_at = version.updated_at
+
+
+def _attach_chunks_to_version(
+    chunks: list[DocumentChunk],
+    version: DocumentVersion | None,
+) -> list[DocumentChunk]:
+    if version is None:
+        return chunks
+
+    return [
+        DocumentChunk(
+            id=chunk.id,
+            document_id=chunk.document_id,
+            document_version_id=version.id,
+            chunk_index=chunk.chunk_index,
+            content=chunk.content,
+            metadata=chunk.metadata,
+            embedding=chunk.embedding,
+            embedding_provider=chunk.embedding_provider,
+            embedding_model=chunk.embedding_model,
+            created_at=chunk.created_at,
+        )
+        for chunk in chunks
+    ]
 
 
 def _next_version_label(versions: list[DocumentVersion]) -> str:

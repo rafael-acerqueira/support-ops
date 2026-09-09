@@ -70,6 +70,7 @@ class DocumentResponse(BaseModel):
 class DocumentChunkResponse(BaseModel):
     id: UUID
     document_id: UUID
+    document_version_id: UUID | None
     chunk_index: int
     content: str
     metadata: dict
@@ -83,6 +84,7 @@ class DocumentChunkResponse(BaseModel):
         return cls(
             id=chunk.id,
             document_id=chunk.document_id,
+            document_version_id=chunk.document_version_id,
             chunk_index=chunk.chunk_index,
             content=chunk.content,
             metadata=chunk.metadata,

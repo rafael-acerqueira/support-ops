@@ -102,8 +102,10 @@ def test_document_version_record_roundtrip_preserves_domain_values() -> None:
 
 
 def test_chunk_record_roundtrip_preserves_domain_values() -> None:
+    version_id = uuid4()
     chunk = DocumentChunk(
         document_id=uuid4(),
+        document_version_id=version_id,
         chunk_index=1,
         content="Enterprise refunds require approval.",
         metadata={"section": "Refund policy"},
@@ -117,6 +119,7 @@ def test_chunk_record_roundtrip_preserves_domain_values() -> None:
 
     assert mapped_chunk.id == chunk.id
     assert mapped_chunk.document_id == chunk.document_id
+    assert mapped_chunk.document_version_id == version_id
     assert mapped_chunk.chunk_index == 1
     assert mapped_chunk.content == "Enterprise refunds require approval."
     assert mapped_chunk.metadata == {"section": "Refund policy"}

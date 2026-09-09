@@ -236,6 +236,7 @@ def _chunk_to_record(chunk: DocumentChunk) -> DocumentChunkRecord:
     return DocumentChunkRecord(
         id=chunk.id,
         document_id=chunk.document_id,
+        document_version_id=chunk.document_version_id,
         chunk_index=chunk.chunk_index,
         content=chunk.content,
         chunk_metadata=chunk.metadata,
@@ -250,6 +251,7 @@ def _record_to_chunk(record: DocumentChunkRecord) -> DocumentChunk:
     return DocumentChunk(
         id=record.id,
         document_id=record.document_id,
+        document_version_id=record.document_version_id,
         chunk_index=record.chunk_index,
         content=record.content,
         metadata=record.chunk_metadata,
