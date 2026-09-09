@@ -127,6 +127,22 @@ class PostgresDocumentVersionRepository(DocumentVersionRepository):
         )
         return [_record_to_version(record) for record in result.scalars()]
 
+    async def get_for_document_snapshot(
+        self, document_id: UUID, version: str, storage_key: str
+    ) -> DocumentVersion | None:
+        result = await self._session.execute(
+            select(DocumentVersionRecord)
+            .where(DocumentVersionRecord.document_id == document_id)
+            .where(DocumentVersionRecord.version == version)
+            .where(DocumentVersionRecord.storage_key == storage_key)
+            .limit(1)
+        )
+        record = result.scalar_one_or_none()
+        if record is None:
+            return None
+
+        return _record_to_version(record)
+
     async def deactivate_all_for_document(self, document_id: UUID) -> None:
         await self._session.execute(
             update(DocumentVersionRecord)

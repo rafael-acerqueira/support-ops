@@ -84,6 +84,19 @@ class InMemoryDocumentVersionRepository:
     async def list_for_document(self, document_id: UUID) -> list[DocumentVersion]:
         return [version for version in self.versions.values() if version.document_id == document_id]
 
+    async def get_for_document_snapshot(
+        self, document_id: UUID, version_label: str, storage_key: str
+    ) -> DocumentVersion | None:
+        for version in self.versions.values():
+            if (
+                version.document_id == document_id
+                and version.version == version_label
+                and version.storage_key == storage_key
+            ):
+                return version
+
+        return None
+
     async def deactivate_all_for_document(self, document_id: UUID) -> None:
         for version in self.versions.values():
             if version.document_id == document_id:
@@ -448,6 +461,49 @@ async def test_process_document_syncs_current_version_when_version_repository_is
     assert version_repository.saved_versions[0].status == DocumentStatus.PROCESSING
     assert version_repository.saved_versions[1].status == DocumentStatus.INDEXED
     assert len(version_repository.saved_versions) == 2
+
+
+@pytest.mark.asyncio
+async def test_process_document_uses_document_snapshot_version() -> None:
+    repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = Document.create(
+        name="Refund Policy",
+        document_type=DocumentType.INTERNAL_POLICY,
+        product_area=ProductArea.BILLING,
+        source_file_name="refund-policy-v2.md",
+        content_type="text/markdown",
+        size_bytes=2048,
+        storage_key="documents/refund-policy/v2.md",
+    )
+    document.version = "v2"
+    active_version = create_indexed_version(document.id, "v1")
+    active_version.activate()
+    uploaded_version = DocumentVersion.create(
+        document_id=document.id,
+        version="v2",
+        source_file_name=document.source_file_name,
+        content_type=document.content_type,
+        size_bytes=document.size_bytes,
+        storage_key=document.storage_key or "",
+    )
+    await repository.add(document)
+    await version_repository.add(active_version)
+    await version_repository.add(uploaded_version)
+
+    await ProcessDocument(
+        repository,
+        SuccessfulDocumentProcessor(),
+        version_repository=version_repository,
+    ).execute(document.id)
+
+    assert uploaded_version.status == DocumentStatus.INDEXED
+    assert uploaded_version.is_active is True
+    assert active_version.is_active is False
+    assert [chunk.document_version_id for chunk in repository.chunks[document.id]] == [
+        uploaded_version.id,
+        uploaded_version.id,
+    ]
 
 
 @pytest.mark.asyncio

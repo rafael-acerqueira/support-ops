@@ -51,6 +51,19 @@ class InMemoryDocumentVersionRepository:
     async def list_for_document(self, document_id: UUID) -> list[DocumentVersion]:
         return [version for version in self.versions.values() if version.document_id == document_id]
 
+    async def get_for_document_snapshot(
+        self, document_id: UUID, version_label: str, storage_key: str
+    ) -> DocumentVersion | None:
+        for version in self.versions.values():
+            if (
+                version.document_id == document_id
+                and version.version == version_label
+                and version.storage_key == storage_key
+            ):
+                return version
+
+        return None
+
     async def deactivate_all_for_document(self, document_id: UUID) -> None:
         for version in self.versions.values():
             if version.document_id == document_id:

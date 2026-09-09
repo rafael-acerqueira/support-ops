@@ -67,6 +67,11 @@ class DocumentVersionRepository(Protocol):
     async def list_for_document(self, document_id: UUID) -> list[DocumentVersion]:
         pass
 
+    async def get_for_document_snapshot(
+        self, document_id: UUID, version: str, storage_key: str
+    ) -> DocumentVersion | None:
+        pass
+
     async def deactivate_all_for_document(self, document_id: UUID) -> None:
         pass
 
@@ -419,12 +424,14 @@ class ProcessDocument:
         if self._version_repository is None:
             return None
 
-        versions = await self._version_repository.list_for_document(document.id)
-        for version in versions:
-            if version.version == document.version and version.storage_key == document.storage_key:
-                return version
+        if document.storage_key is None:
+            return None
 
-        return None
+        return await self._version_repository.get_for_document_snapshot(
+            document.id,
+            document.version,
+            document.storage_key,
+        )
 
 
 def _sync_document_from_version(document: Document, version: DocumentVersion) -> None:
