@@ -65,6 +65,17 @@ class PostgresDocumentRepository(DocumentRepository):
         )
         return [_record_to_chunk(record) for record in result.scalars()]
 
+    async def list_chunks_for_version(
+        self, document_id: UUID, document_version_id: UUID
+    ) -> list[DocumentChunk]:
+        result = await self._session.execute(
+            select(DocumentChunkRecord)
+            .where(DocumentChunkRecord.document_id == document_id)
+            .where(DocumentChunkRecord.document_version_id == document_version_id)
+            .order_by(DocumentChunkRecord.chunk_index.asc())
+        )
+        return [_record_to_chunk(record) for record in result.scalars()]
+
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
         if any(chunk.document_id != document_id for chunk in chunks):
             raise ValueError("All chunks must belong to the document being replaced")

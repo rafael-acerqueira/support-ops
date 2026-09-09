@@ -45,6 +45,11 @@ class DocumentRepository(Protocol):
     async def list_chunks(self, document_id: UUID) -> list[DocumentChunk]:
         pass
 
+    async def list_chunks_for_version(
+        self, document_id: UUID, document_version_id: UUID
+    ) -> list[DocumentChunk]:
+        pass
+
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
         pass
 
@@ -270,6 +275,27 @@ class ListDocumentChunks:
             raise DocumentNotFoundError(document_id)
 
         return await self._repository.list_chunks(document_id)
+
+
+class ListDocumentVersionChunks:
+    def __init__(
+        self,
+        document_repository: DocumentRepository,
+        version_repository: DocumentVersionRepository,
+    ) -> None:
+        self._document_repository = document_repository
+        self._version_repository = version_repository
+
+    async def execute(self, document_id: UUID, version_id: UUID) -> list[DocumentChunk]:
+        document = await self._document_repository.get(document_id)
+        if document is None:
+            raise DocumentNotFoundError(document_id)
+
+        version = await self._version_repository.get(version_id)
+        if version is None or version.document_id != document.id:
+            raise DocumentVersionNotFoundError(version_id)
+
+        return await self._document_repository.list_chunks_for_version(document_id, version_id)
 
 
 class ActivateDocument:

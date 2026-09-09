@@ -34,6 +34,7 @@ from supportops_api.application.documents import (
     DocumentVersionRepository,
     GetDocument,
     ListDocumentChunks,
+    ListDocumentVersionChunks,
     ListDocumentVersions,
     ListDocuments,
 )
@@ -191,6 +192,28 @@ async def list_document_versions(
         raise _not_found_error(error) from error
 
     return [DocumentVersionResponse.from_domain(version) for version in versions]
+
+
+@router.get(
+    "/{document_id}/versions/{version_id}/chunks",
+    response_model=list[DocumentChunkResponse],
+)
+async def list_document_version_chunks(
+    document_id: UUID,
+    version_id: UUID,
+    repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
+) -> list[DocumentChunkResponse]:
+    try:
+        chunks = await ListDocumentVersionChunks(repository, version_repository).execute(
+            document_id, version_id
+        )
+    except DocumentNotFoundError as error:
+        raise _not_found_error(error) from error
+    except DocumentVersionNotFoundError as error:
+        raise _version_not_found_error(error) from error
+
+    return [DocumentChunkResponse.from_domain(chunk) for chunk in chunks]
 
 
 @router.post(

@@ -16,6 +16,7 @@ from supportops_api.application.documents import (
     GeneratedEmbedding,
     GetDocument,
     ListDocumentChunks,
+    ListDocumentVersionChunks,
     ListDocumentVersions,
     ListDocuments,
     ProcessDocument,
@@ -51,6 +52,15 @@ class InMemoryDocumentRepository:
 
     async def list_chunks(self, document_id: UUID) -> list[DocumentChunk]:
         return self.chunks.get(document_id, [])
+
+    async def list_chunks_for_version(
+        self, document_id: UUID, document_version_id: UUID
+    ) -> list[DocumentChunk]:
+        return [
+            chunk
+            for chunk in self.chunks.get(document_id, [])
+            if chunk.document_version_id == document_version_id
+        ]
 
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
         self.chunks[document_id] = chunks
@@ -319,6 +329,54 @@ async def test_list_document_chunks_returns_document_chunks() -> None:
     listed_chunks = await ListDocumentChunks(repository).execute(document.id)
 
     assert listed_chunks == chunks
+
+
+@pytest.mark.asyncio
+async def test_list_document_version_chunks_returns_chunks_for_version() -> None:
+    document_repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = create_uploaded_document()
+    version = create_indexed_version(document.id)
+    other_version = create_indexed_version(document.id, "v3")
+    chunks = [
+        DocumentChunk(
+            document_id=document.id,
+            document_version_id=version.id,
+            chunk_index=0,
+            content="Refund policy",
+        ),
+        DocumentChunk(
+            document_id=document.id,
+            document_version_id=other_version.id,
+            chunk_index=0,
+            content="Other refund policy",
+        ),
+    ]
+    await document_repository.add(document)
+    await version_repository.add(version)
+    await version_repository.add(other_version)
+    await document_repository.replace_chunks(document.id, chunks)
+
+    listed_chunks = await ListDocumentVersionChunks(
+        document_repository, version_repository
+    ).execute(document.id, version.id)
+
+    assert listed_chunks == [chunks[0]]
+
+
+@pytest.mark.asyncio
+async def test_list_document_version_chunks_rejects_version_from_another_document() -> None:
+    document_repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = create_uploaded_document()
+    version = create_indexed_version(uuid4())
+    await document_repository.add(document)
+    await version_repository.add(version)
+
+    with pytest.raises(DocumentVersionNotFoundError):
+        await ListDocumentVersionChunks(document_repository, version_repository).execute(
+            document.id, version.id
+        )
 
 
 @pytest.mark.asyncio

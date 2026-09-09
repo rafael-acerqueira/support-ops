@@ -120,6 +120,15 @@ class InMemoryDocumentRepository(DocumentRepository):
     async def list_chunks(self, document_id: UUID) -> list[DocumentChunk]:
         return self.chunks.get(document_id, [])
 
+    async def list_chunks_for_version(
+        self, document_id: UUID, document_version_id: UUID
+    ) -> list[DocumentChunk]:
+        return [
+            chunk
+            for chunk in self.chunks.get(document_id, [])
+            if chunk.document_version_id == document_version_id
+        ]
+
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
         self.chunks[document_id] = chunks
 
@@ -344,6 +353,51 @@ async def test_list_document_versions_returns_404(
 
     assert response.status_code == 404
     assert response.json()["detail"]["document_id"] == str(document_id)
+
+
+@pytest.mark.asyncio
+async def test_list_document_version_chunks(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, version_repository, _storage, _processing_queue, _session = api_client
+    document = create_document(repository)
+    version = create_indexed_version(version_repository, document.id)
+    chunk = DocumentChunk(
+        document_id=document.id,
+        document_version_id=version.id,
+        chunk_index=0,
+        content="Refund requests must include a reason.",
+        embedding=(0.1, -0.2),
+        embedding_provider="openai",
+        embedding_model="text-embedding-3-small",
+    )
+    repository.chunks[document.id] = [chunk]
+
+    response = await client.get(f"/api/documents/{document.id}/versions/{version.id}/chunks")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body[0]["id"] == str(chunk.id)
+    assert body[0]["document_version_id"] == str(version.id)
+    assert body[0]["has_embedding"] is True
+
+
+@pytest.mark.asyncio
+async def test_list_document_version_chunks_returns_404_for_wrong_version(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, version_repository, _storage, _processing_queue, _session = api_client
+    document = create_document(repository)
+    version = create_indexed_version(version_repository, uuid4())
+
+    response = await client.get(f"/api/documents/{document.id}/versions/{version.id}/chunks")
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["document_version_id"] == str(version.id)
 
 
 @pytest.mark.asyncio
