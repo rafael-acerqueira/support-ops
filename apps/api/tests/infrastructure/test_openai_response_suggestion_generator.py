@@ -45,6 +45,8 @@ class FakeKnowledgeRetriever:
                 document_id=UUID("53585070-2a9b-4a59-b78e-e97daef49f1a"),
                 document_name="billing-playbook.md",
                 document_type="playbook",
+                document_version_id=UUID("f3639010-dc32-4396-9b78-9c526d5f8ee9"),
+                document_version="v2",
                 chunk_id=UUID("fb27fd5f-3813-4977-97b5-e129439f7f6c"),
                 chunk_index=0,
                 content="Validate duplicate invoice charges before promising a refund.",
@@ -80,6 +82,8 @@ async def test_openai_response_suggestion_generator_returns_suggestion() -> None
     assert generated.sources == [
         {
             "document_id": "53585070-2a9b-4a59-b78e-e97daef49f1a",
+            "document_version_id": "f3639010-dc32-4396-9b78-9c526d5f8ee9",
+            "document_version": "v2",
             "chunk_id": "fb27fd5f-3813-4977-97b5-e129439f7f6c",
             "chunk_index": 0,
             "document_name": "billing-playbook.md",
@@ -104,6 +108,7 @@ async def test_openai_response_suggestion_generator_returns_suggestion() -> None
     assert "# Ticket" in input_text
     assert "Billing export failed" in input_text
     assert "# Retrieved internal knowledge sources" in input_text
+    assert "billing-playbook.md v2" in input_text
     assert "Validate duplicate invoice charges" in input_text
     assert "# Task" in input_text
 

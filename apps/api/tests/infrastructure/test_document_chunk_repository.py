@@ -6,10 +6,15 @@ from supportops_api.infrastructure.persistence.document_chunk_repository import 
     _record_to_source,
     _vector_distance_expression,
 )
-from supportops_api.infrastructure.persistence.models import DocumentChunkRecord, DocumentRecord
+from supportops_api.infrastructure.persistence.models import (
+    DocumentChunkRecord,
+    DocumentRecord,
+    DocumentVersionRecord,
+)
 
 
 def test_record_to_source_maps_similarity_result() -> None:
+    version_id = UUID("f3639010-dc32-4396-9b78-9c526d5f8ee9")
     document = DocumentRecord(
         id=UUID("53585070-2a9b-4a59-b78e-e97daef49f1a"),
         name="refund-policy.md",
@@ -28,16 +33,31 @@ def test_record_to_source_maps_similarity_result() -> None:
     chunk = DocumentChunkRecord(
         id=UUID("fb27fd5f-3813-4977-97b5-e129439f7f6c"),
         document_id=document.id,
+        document_version_id=version_id,
         chunk_index=2,
         content="Validate duplicate invoice charges before promising a refund.",
         chunk_metadata={"section": "Refund policy"},
     )
+    version = DocumentVersionRecord(
+        id=version_id,
+        document_id=document.id,
+        version="v2",
+        status="indexed",
+        is_active=True,
+        source_file_name="refund-policy-v2.md",
+        storage_key="documents/refund-policy/v2.md",
+        content_type="text/markdown",
+        size_bytes=2048,
+        chunk_count=1,
+    )
 
-    source = _record_to_source(document, chunk, distance=0.14)
+    source = _record_to_source(document, chunk, distance=0.14, version=version)
 
     assert source.document_id == document.id
     assert source.document_name == "refund-policy.md"
     assert source.document_type == "internal_policy"
+    assert source.document_version_id == version_id
+    assert source.document_version == "v2"
     assert source.chunk_id == chunk.id
     assert source.chunk_index == 2
     assert source.content == "Validate duplicate invoice charges before promising a refund."

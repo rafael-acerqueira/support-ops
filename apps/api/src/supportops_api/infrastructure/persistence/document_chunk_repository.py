@@ -24,7 +24,7 @@ class PostgresDocumentChunkRepository(KnowledgeSourceRepository):
 
     async def list_indexed_chunks(self, *, limit: int = 50) -> list[KnowledgeChunkCandidate]:
         result = await self._session.execute(
-            select(DocumentRecord, DocumentChunkRecord)
+            select(DocumentRecord, DocumentChunkRecord, DocumentVersionRecord)
             .join(DocumentChunkRecord, DocumentChunkRecord.document_id == DocumentRecord.id)
             .outerjoin(
                 DocumentVersionRecord,
@@ -39,7 +39,10 @@ class PostgresDocumentChunkRepository(KnowledgeSourceRepository):
             .limit(limit)
         )
 
-        return [_record_to_candidate(document, chunk) for document, chunk in result.all()]
+        return [
+            _record_to_candidate(document, chunk, version)
+            for document, chunk, version in result.all()
+        ]
 
     async def search_similar_chunks(
         self,
@@ -53,7 +56,12 @@ class PostgresDocumentChunkRepository(KnowledgeSourceRepository):
         distance = _vector_distance_expression(embedding)
 
         result = await self._session.execute(
-            select(DocumentRecord, DocumentChunkRecord, distance.label("distance"))
+            select(
+                DocumentRecord,
+                DocumentChunkRecord,
+                DocumentVersionRecord,
+                distance.label("distance"),
+            )
             .join(DocumentChunkRecord, DocumentChunkRecord.document_id == DocumentRecord.id)
             .outerjoin(
                 DocumentVersionRecord,
@@ -74,18 +82,22 @@ class PostgresDocumentChunkRepository(KnowledgeSourceRepository):
         )
 
         return [
-            _record_to_source(document, chunk, distance)
-            for document, chunk, distance in result.all()
+            _record_to_source(document, chunk, distance, version)
+            for document, chunk, version, distance in result.all()
         ]
 
 
 def _record_to_candidate(
-    document: DocumentRecord, chunk: DocumentChunkRecord
+    document: DocumentRecord,
+    chunk: DocumentChunkRecord,
+    version: DocumentVersionRecord | None = None,
 ) -> KnowledgeChunkCandidate:
     return KnowledgeChunkCandidate(
         document_id=document.id,
         document_name=document.name,
         document_type=document.document_type,
+        document_version_id=chunk.document_version_id,
+        document_version=version.version if version else None,
         product_area=document.product_area,
         tags=tuple(document.tags or []),
         chunk_id=chunk.id,
@@ -98,11 +110,14 @@ def _record_to_source(
     document: DocumentRecord,
     chunk: DocumentChunkRecord,
     distance: float,
+    version: DocumentVersionRecord | None = None,
 ) -> RetrievedKnowledgeSource:
     return RetrievedKnowledgeSource(
         document_id=document.id,
         document_name=document.name,
         document_type=document.document_type,
+        document_version_id=chunk.document_version_id,
+        document_version=version.version if version else None,
         chunk_id=chunk.id,
         chunk_index=chunk.chunk_index,
         content=chunk.content,

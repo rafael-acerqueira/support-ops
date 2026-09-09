@@ -64,7 +64,7 @@ def _build_content(ticket: Ticket, sources: list[RetrievedKnowledgeSource]) -> s
 
 
 def _source_to_response(source: RetrievedKnowledgeSource) -> dict[str, object]:
-    return {
+    response: dict[str, object] = {
         "document_id": str(source.document_id),
         "chunk_id": str(source.chunk_id),
         "chunk_index": source.chunk_index,
@@ -73,6 +73,13 @@ def _source_to_response(source: RetrievedKnowledgeSource) -> dict[str, object]:
         "relevance_score": source.relevance_score,
         "excerpt": _excerpt(source.content),
     }
+
+    if source.document_version_id:
+        response["document_version_id"] = str(source.document_version_id)
+    if source.document_version:
+        response["document_version"] = source.document_version
+
+    return response
 
 
 def _excerpt(content: str, *, max_length: int = 280) -> str:

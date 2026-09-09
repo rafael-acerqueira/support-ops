@@ -55,6 +55,8 @@ class RetrievedKnowledgeSource:
     chunk_index: int
     content: str
     relevance_score: float
+    document_version_id: UUID | None = None
+    document_version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,8 @@ class KnowledgeChunkCandidate:
     chunk_id: UUID
     chunk_index: int
     content: str
+    document_version_id: UUID | None = None
+    document_version: str | None = None
 
 
 class KnowledgeSourceRepository(Protocol):

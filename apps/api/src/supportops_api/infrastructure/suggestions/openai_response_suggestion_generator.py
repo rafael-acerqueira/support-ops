@@ -150,7 +150,7 @@ def _build_instructions() -> str:
 def _build_input(ticket: Ticket, sources: list[RetrievedKnowledgeSource]) -> str:
     sources_text = "\n\n".join(
         (
-            f"Source {index + 1}: {source.document_name} "
+            f"Source {index + 1}: {_source_label(source)} "
             f"({source.document_type}, chunk {source.chunk_index + 1}, "
             f"relevance {source.relevance_score})\n{source.content}"
         )
@@ -175,3 +175,10 @@ def _build_input(ticket: Ticket, sources: list[RetrievedKnowledgeSource]) -> str
         "retrieved sources. If the retrieved sources do not support a concrete answer, produce a "
         "careful draft that asks for confirmation or includes an Internal review note."
     )
+
+
+def _source_label(source: RetrievedKnowledgeSource) -> str:
+    if source.document_version:
+        return f"{source.document_name} {source.document_version}"
+
+    return source.document_name
