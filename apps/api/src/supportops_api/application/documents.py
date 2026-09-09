@@ -357,12 +357,10 @@ class ProcessDocument:
             chunks = await self._processor.process(document)
             chunks = _attach_chunks_to_version(chunks, current_version)
             chunks = await self._generate_embeddings(chunks)
-            document.mark_indexed(chunk_count=len(chunks))
             await self._repository.replace_chunks(document.id, chunks)
-            await self._sync_processed_version(document)
+            await self._mark_processed(document, current_version, chunk_count=len(chunks))
         except Exception as exc:
-            document.mark_failed(str(exc))
-            await self._sync_failed_version(document)
+            await self._mark_failed(document, current_version, str(exc))
             raise
         finally:
             await self._repository.save(document)
@@ -402,23 +400,36 @@ class ProcessDocument:
 
         return embedded_chunks
 
-    async def _sync_processed_version(self, document: Document) -> None:
-        version = await self._find_current_version(document)
+    async def _mark_processed(
+        self,
+        document: Document,
+        version: DocumentVersion | None,
+        *,
+        chunk_count: int,
+    ) -> None:
         if version is None:
+            document.mark_indexed(chunk_count=chunk_count)
             return
 
-        version.mark_indexed(chunk_count=document.chunk_count)
+        version.mark_indexed(chunk_count=chunk_count)
         await self._version_repository.deactivate_all_for_document(document.id)
         version.activate()
         await self._version_repository.save(version)
+        _sync_document_from_version(document, version)
 
-    async def _sync_failed_version(self, document: Document) -> None:
-        version = await self._find_current_version(document)
-        if version is None or document.failure_reason is None:
+    async def _mark_failed(
+        self,
+        document: Document,
+        version: DocumentVersion | None,
+        reason: str,
+    ) -> None:
+        if version is None:
+            document.mark_failed(reason)
             return
 
-        version.mark_failed(document.failure_reason)
+        version.mark_failed(reason)
         await self._version_repository.save(version)
+        _sync_document_from_version(document, version)
 
     async def _find_current_version(self, document: Document) -> DocumentVersion | None:
         if self._version_repository is None:
