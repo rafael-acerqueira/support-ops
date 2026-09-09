@@ -38,7 +38,7 @@ from supportops_api.application.documents import (
     ListDocumentVersions,
     ListDocuments,
 )
-from supportops_api.domain.documents import DocumentType, ProductArea
+from supportops_api.domain.documents import Document, DocumentType, DocumentVersion, ProductArea
 from supportops_api.infrastructure.database import get_session
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -58,6 +58,28 @@ def _version_not_found_error(error: DocumentVersionNotFoundError) -> HTTPExcepti
             "message": "Document version not found",
             "document_version_id": str(error.document_version_id),
         },
+    )
+
+
+async def _document_response(
+    document: Document,
+    version_repository: DocumentVersionRepository,
+) -> DocumentResponse:
+    version = await _document_processing_version(document, version_repository)
+    return DocumentResponse.from_domain(document, processing_version=version)
+
+
+async def _document_processing_version(
+    document: Document,
+    version_repository: DocumentVersionRepository,
+) -> DocumentVersion | None:
+    if document.storage_key is None:
+        return None
+
+    return await version_repository.get_for_document_snapshot(
+        document.id,
+        document.version,
+        document.storage_key,
     )
 
 
@@ -122,7 +144,7 @@ async def upload_document(
             storage_key=stored_file.storage_key,
         )
     )
-    await CreateDocumentVersion(repository, version_repository).execute(
+    version = await CreateDocumentVersion(repository, version_repository).execute(
         CreateDocumentVersionInput(
             document_id=document.id,
             version=document.version,
@@ -143,28 +165,30 @@ async def upload_document(
         ) from error
 
     await session.commit()
-    return DocumentResponse.from_domain(document)
+    return DocumentResponse.from_domain(document, processing_version=version)
 
 
 @router.get("", response_model=list[DocumentResponse])
 async def list_documents(
     repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
 ) -> list[DocumentResponse]:
     documents = await ListDocuments(repository).execute()
-    return [DocumentResponse.from_domain(document) for document in documents]
+    return [await _document_response(document, version_repository) for document in documents]
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: UUID,
     repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
 ) -> DocumentResponse:
     try:
         document = await GetDocument(repository).execute(document_id)
     except DocumentNotFoundError as error:
         raise _not_found_error(error) from error
 
-    return DocumentResponse.from_domain(document)
+    return await _document_response(document, version_repository)
 
 
 @router.get("/{document_id}/chunks", response_model=list[DocumentChunkResponse])
@@ -307,6 +331,7 @@ async def activate_document_version(
 async def activate_document(
     document_id: UUID,
     repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentResponse:
     try:
@@ -315,13 +340,14 @@ async def activate_document(
         raise _not_found_error(error) from error
 
     await session.commit()
-    return DocumentResponse.from_domain(document)
+    return await _document_response(document, version_repository)
 
 
 @router.post("/{document_id}/deactivate", response_model=DocumentResponse)
 async def deactivate_document(
     document_id: UUID,
     repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentResponse:
     try:
@@ -330,7 +356,7 @@ async def deactivate_document(
         raise _not_found_error(error) from error
 
     await session.commit()
-    return DocumentResponse.from_domain(document)
+    return await _document_response(document, version_repository)
 
 
 @router.post(

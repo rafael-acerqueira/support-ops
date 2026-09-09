@@ -32,8 +32,13 @@ from supportops_api.infrastructure.database import get_session
 
 
 class FakeDocumentProcessingQueue:
-    def __init__(self, repository: InMemoryDocumentRepository) -> None:
+    def __init__(
+        self,
+        repository: InMemoryDocumentRepository,
+        version_repository: InMemoryDocumentVersionRepository,
+    ) -> None:
         self._repository = repository
+        self._version_repository = version_repository
         self.should_fail = False
         self.enqueued_document_ids: list[UUID] = []
 
@@ -44,21 +49,61 @@ class FakeDocumentProcessingQueue:
             raise DocumentNotFoundError(document_id)
         if self.should_fail:
             document.mark_failed("Document has no storage key")
+            await self._mark_version_failed(document)
             await self._repository.save(document)
             raise ValueError("Document has no storage key")
 
         document.start_processing()
+        version = await self._processing_version(document)
+        if version is not None:
+            version.start_processing()
+            await self._version_repository.save(version)
+
         chunks = [
-            DocumentChunk(document_id=document.id, chunk_index=0, content="First chunk"),
-            DocumentChunk(document_id=document.id, chunk_index=1, content="Second chunk"),
+            DocumentChunk(
+                document_id=document.id,
+                document_version_id=version.id if version else None,
+                chunk_index=0,
+                content="First chunk",
+            ),
+            DocumentChunk(
+                document_id=document.id,
+                document_version_id=version.id if version else None,
+                chunk_index=1,
+                content="Second chunk",
+            ),
         ]
         document.mark_indexed(chunk_count=len(chunks))
+        if version is not None:
+            version.mark_indexed(chunk_count=len(chunks))
+            await self._version_repository.deactivate_all_for_document(document.id)
+            version.activate()
+            await self._version_repository.save(version)
+
         await self._repository.replace_chunks(document.id, chunks)
         await self._repository.save(document)
         return EnqueuedDocumentProcessing(
             document_id=document.id,
             task_id=f"fake:{document.id}",
         )
+
+    async def _processing_version(self, document: Document) -> DocumentVersion | None:
+        if document.storage_key is None:
+            return None
+
+        return await self._version_repository.get_for_document_snapshot(
+            document.id,
+            document.version,
+            document.storage_key,
+        )
+
+    async def _mark_version_failed(self, document: Document) -> None:
+        version = await self._processing_version(document)
+        if version is None:
+            return
+
+        version.mark_failed("Document has no storage key")
+        await self._version_repository.save(version)
 
 
 class FakeSession:
@@ -180,7 +225,7 @@ async def api_client() -> AsyncIterator[
     repository = InMemoryDocumentRepository()
     version_repository = InMemoryDocumentVersionRepository()
     storage = InMemoryDocumentStorage()
-    processing_queue = FakeDocumentProcessingQueue(repository)
+    processing_queue = FakeDocumentProcessingQueue(repository, version_repository)
     session = FakeSession()
 
     app.dependency_overrides[get_document_repository] = lambda: repository
@@ -274,6 +319,29 @@ async def test_list_documents(
 
 
 @pytest.mark.asyncio
+async def test_list_documents_uses_document_version_processing_fields(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, version_repository, _storage, _processing_queue, _session = api_client
+    document = create_document(repository)
+    version = create_indexed_version(version_repository, document.id)
+    document.version = version.version
+    document.storage_key = version.storage_key
+
+    response = await client.get("/api/documents")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body[0]["id"] == str(document.id)
+    assert body[0]["version"] == "v2"
+    assert body[0]["status"] == "indexed"
+    assert body[0]["chunk_count"] == 3
+    assert body[0]["storage_key"] == "documents/refund-policy/v2.md"
+
+
+@pytest.mark.asyncio
 async def test_get_document(
     api_client: tuple[
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
@@ -286,6 +354,29 @@ async def test_get_document(
 
     assert response.status_code == 200
     assert response.json()["id"] == str(document.id)
+
+
+@pytest.mark.asyncio
+async def test_get_document_uses_document_version_processing_fields(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, version_repository, _storage, _processing_queue, _session = api_client
+    document = create_document(repository)
+    version = create_indexed_version(version_repository, document.id)
+    document.version = version.version
+    document.storage_key = version.storage_key
+
+    response = await client.get(f"/api/documents/{document.id}")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["id"] == str(document.id)
+    assert body["version"] == "v2"
+    assert body["status"] == "indexed"
+    assert body["chunk_count"] == 3
+    assert body["storage_key"] == "documents/refund-policy/v2.md"
 
 
 @pytest.mark.asyncio
