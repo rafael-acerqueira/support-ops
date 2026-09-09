@@ -172,6 +172,15 @@ class DocumentVersionRecord(Base):
 
 class DocumentChunkRecord(Base):
     __tablename__ = "document_chunks"
+    __table_args__ = (
+        Index(
+            "uq_document_chunks_document_version_id_chunk_index",
+            "document_version_id",
+            "chunk_index",
+            unique=True,
+            postgresql_where=text("document_version_id is not null"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True)
     document_id: Mapped[UUID] = mapped_column(
