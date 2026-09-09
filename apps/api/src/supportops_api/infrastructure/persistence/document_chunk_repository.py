@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Float, literal, select
+from sqlalchemy import Float, and_, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -13,6 +13,7 @@ from supportops_api.domain.documents import DocumentStatus
 from supportops_api.infrastructure.persistence.models import (
     DocumentChunkRecord,
     DocumentRecord,
+    DocumentVersionRecord,
     Vector,
 )
 
@@ -25,9 +26,14 @@ class PostgresDocumentChunkRepository(KnowledgeSourceRepository):
         result = await self._session.execute(
             select(DocumentRecord, DocumentChunkRecord)
             .join(DocumentChunkRecord, DocumentChunkRecord.document_id == DocumentRecord.id)
+            .outerjoin(
+                DocumentVersionRecord,
+                DocumentChunkRecord.document_version_id == DocumentVersionRecord.id,
+            )
             .where(
                 DocumentRecord.is_active.is_(True),
                 DocumentRecord.status == DocumentStatus.INDEXED.value,
+                _active_or_legacy_chunk_version_filter(),
             )
             .order_by(DocumentRecord.updated_at.desc(), DocumentChunkRecord.chunk_index.asc())
             .limit(limit)
@@ -49,10 +55,15 @@ class PostgresDocumentChunkRepository(KnowledgeSourceRepository):
         result = await self._session.execute(
             select(DocumentRecord, DocumentChunkRecord, distance.label("distance"))
             .join(DocumentChunkRecord, DocumentChunkRecord.document_id == DocumentRecord.id)
+            .outerjoin(
+                DocumentVersionRecord,
+                DocumentChunkRecord.document_version_id == DocumentVersionRecord.id,
+            )
             .where(
                 DocumentRecord.is_active.is_(True),
                 DocumentRecord.status == DocumentStatus.INDEXED.value,
                 DocumentChunkRecord.embedding.is_not(None),
+                _active_or_legacy_chunk_version_filter(),
             )
             .order_by(
                 distance.asc(),
@@ -106,3 +117,13 @@ def _distance_to_relevance(distance: float) -> float:
 def _vector_distance_expression(embedding: tuple[float, ...]) -> ColumnElement[float]:
     query_vector = literal(embedding, type_=Vector(len(embedding)))
     return DocumentChunkRecord.embedding.op("<=>", return_type=Float())(query_vector)
+
+
+def _active_or_legacy_chunk_version_filter() -> ColumnElement[bool]:
+    return or_(
+        DocumentChunkRecord.document_version_id.is_(None),
+        and_(
+            DocumentVersionRecord.is_active.is_(True),
+            DocumentVersionRecord.status == DocumentStatus.INDEXED.value,
+        ),
+    )
