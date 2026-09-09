@@ -16,6 +16,7 @@ from supportops_api.domain.documents import (
 from supportops_api.infrastructure.database import get_database_url
 from supportops_api.infrastructure.persistence.document_repository import (
     PostgresDocumentRepository,
+    _active_or_legacy_chunk_version_filter,
     _chunk_replacement_version_id,
     _chunk_to_record,
     _document_to_record,
@@ -154,6 +155,14 @@ def test_chunk_replacement_version_id_returns_common_version() -> None:
     ]
 
     assert _chunk_replacement_version_id(chunks) == version_id
+
+
+def test_active_or_legacy_chunk_version_filter_allows_active_versions_and_legacy_chunks() -> None:
+    compiled = str(_active_or_legacy_chunk_version_filter().compile())
+
+    assert "document_chunks.document_version_id IS NULL" in compiled
+    assert "document_versions.is_active IS true" in compiled
+    assert "document_versions.status" in compiled
 
 
 def test_vector_type_converts_python_values_to_pgvector_text() -> None:
