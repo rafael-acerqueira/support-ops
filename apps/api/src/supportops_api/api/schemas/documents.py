@@ -45,23 +45,28 @@ class DocumentResponse(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def from_domain(cls, document: Document) -> DocumentResponse:
+    def from_domain(
+        cls,
+        document: Document,
+        processing_version: DocumentVersion | None = None,
+    ) -> DocumentResponse:
+        version = processing_version
         return cls(
             id=document.id,
             name=document.name,
             document_type=document.document_type,
             product_area=document.product_area,
-            version=document.version,
-            status=document.status,
+            version=version.version if version else document.version,
+            status=version.status if version else document.status,
             is_active=document.is_active,
             tags=list(document.tags),
-            source_file_name=document.source_file_name,
-            storage_key=document.storage_key,
-            content_type=document.content_type,
-            size_bytes=document.size_bytes,
-            chunk_count=document.chunk_count,
-            failure_reason=document.failure_reason,
-            last_processed_at=document.last_processed_at,
+            source_file_name=version.source_file_name if version else document.source_file_name,
+            storage_key=version.storage_key if version else document.storage_key,
+            content_type=version.content_type if version else document.content_type,
+            size_bytes=version.size_bytes if version else document.size_bytes,
+            chunk_count=version.chunk_count if version else document.chunk_count,
+            failure_reason=version.failure_reason if version else document.failure_reason,
+            last_processed_at=version.last_processed_at if version else document.last_processed_at,
             created_at=document.created_at,
             updated_at=document.updated_at,
         )
