@@ -16,6 +16,7 @@ from supportops_api.domain.documents import (
 from supportops_api.infrastructure.database import get_database_url
 from supportops_api.infrastructure.persistence.document_repository import (
     PostgresDocumentRepository,
+    _chunk_replacement_version_id,
     _chunk_to_record,
     _document_to_record,
     _record_to_chunk,
@@ -128,6 +129,33 @@ def test_chunk_record_roundtrip_preserves_domain_values() -> None:
     assert mapped_chunk.embedding_model == "text-embedding-3-small"
 
 
+def test_chunk_replacement_version_id_returns_none_for_legacy_chunks() -> None:
+    chunks = [DocumentChunk(document_id=uuid4(), chunk_index=0, content="Legacy chunk")]
+
+    assert _chunk_replacement_version_id(chunks) is None
+
+
+def test_chunk_replacement_version_id_returns_common_version() -> None:
+    document_id = uuid4()
+    version_id = uuid4()
+    chunks = [
+        DocumentChunk(
+            document_id=document_id,
+            document_version_id=version_id,
+            chunk_index=0,
+            content="First chunk",
+        ),
+        DocumentChunk(
+            document_id=document_id,
+            document_version_id=version_id,
+            chunk_index=1,
+            content="Second chunk",
+        ),
+    ]
+
+    assert _chunk_replacement_version_id(chunks) == version_id
+
+
 def test_vector_type_converts_python_values_to_pgvector_text() -> None:
     process = Vector(3).bind_processor(None)
 
@@ -149,6 +177,29 @@ async def test_replace_chunks_rejects_chunks_from_another_document() -> None:
     chunks = [DocumentChunk(document_id=uuid4(), chunk_index=0, content="Wrong document")]
 
     with pytest.raises(ValueError, match="belong to the document"):
+        await repository.replace_chunks(document_id, chunks)
+
+
+@pytest.mark.asyncio
+async def test_replace_chunks_rejects_chunks_from_multiple_document_versions() -> None:
+    repository = PostgresDocumentRepository(session=None)  # type: ignore[arg-type]
+    document_id = uuid4()
+    chunks = [
+        DocumentChunk(
+            document_id=document_id,
+            document_version_id=uuid4(),
+            chunk_index=0,
+            content="First version chunk",
+        ),
+        DocumentChunk(
+            document_id=document_id,
+            document_version_id=uuid4(),
+            chunk_index=1,
+            content="Second version chunk",
+        ),
+    ]
+
+    with pytest.raises(ValueError, match="same document version"):
         await repository.replace_chunks(document_id, chunks)
 
 

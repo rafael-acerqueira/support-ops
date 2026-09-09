@@ -64,9 +64,17 @@ class PostgresDocumentRepository(DocumentRepository):
         if any(chunk.document_id != document_id for chunk in chunks):
             raise ValueError("All chunks must belong to the document being replaced")
 
-        await self._session.execute(
-            delete(DocumentChunkRecord).where(DocumentChunkRecord.document_id == document_id)
+        replacement_version_id = _chunk_replacement_version_id(chunks)
+
+        delete_statement = delete(DocumentChunkRecord).where(
+            DocumentChunkRecord.document_id == document_id
         )
+        if replacement_version_id:
+            delete_statement = delete_statement.where(
+                DocumentChunkRecord.document_version_id == replacement_version_id
+            )
+
+        await self._session.execute(delete_statement)
         self._session.add_all(_chunk_to_record(chunk) for chunk in chunks)
         await self._session.flush()
 
@@ -260,6 +268,14 @@ def _record_to_chunk(record: DocumentChunkRecord) -> DocumentChunk:
         embedding_model=record.embedding_model,
         created_at=record.created_at,
     )
+
+
+def _chunk_replacement_version_id(chunks: list[DocumentChunk]) -> UUID | None:
+    version_ids = {chunk.document_version_id for chunk in chunks if chunk.document_version_id}
+    if len(version_ids) > 1:
+        raise ValueError("All chunks must belong to the same document version")
+
+    return next(iter(version_ids), None)
 
 
 def _embedding_to_tuple(value: Sequence[float] | str | None) -> tuple[float, ...] | None:
