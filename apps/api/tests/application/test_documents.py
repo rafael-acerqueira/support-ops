@@ -205,6 +205,7 @@ async def test_create_document_version_persists_uploaded_version() -> None:
     assert version.document_id == document.id
     assert version.version == "v2"
     assert version.status == DocumentStatus.UPLOADED
+    assert document_repository.documents[document.id].current_version_id == version.id
     assert document_repository.documents[document.id].version == "v2"
     assert document_repository.documents[document.id].storage_key == "documents/refund-policy/v2.md"
 
@@ -229,6 +230,7 @@ async def test_create_document_version_uses_next_version_label_when_not_provided
     )
 
     assert version.version == "v3"
+    assert document_repository.documents[document.id].current_version_id == version.id
     assert document_repository.documents[document.id].version == "v3"
     assert document_repository.documents[document.id].status == DocumentStatus.UPLOADED
 
@@ -308,6 +310,7 @@ async def test_activate_document_version_updates_active_version_and_document_sna
     assert activated == new_version
     assert activated.is_active is True
     assert old_version.is_active is False
+    assert document.current_version_id == new_version.id
     assert document.version == "v2"
     assert document.storage_key == "documents/refund-policy/v2.md"
     assert document.status == DocumentStatus.INDEXED
@@ -452,6 +455,7 @@ async def test_process_document_syncs_current_version_when_version_repository_is
 
     assert version.status == DocumentStatus.INDEXED
     assert version.is_active is True
+    assert document.current_version_id == version.id
     assert version.chunk_count == 2
     assert version.last_processed_at is not None
     assert [chunk.document_version_id for chunk in repository.chunks[document.id]] == [
@@ -500,6 +504,7 @@ async def test_process_document_uses_document_snapshot_version() -> None:
     assert uploaded_version.status == DocumentStatus.INDEXED
     assert uploaded_version.is_active is True
     assert active_version.is_active is False
+    assert document.current_version_id == uploaded_version.id
     assert [chunk.document_version_id for chunk in repository.chunks[document.id]] == [
         uploaded_version.id,
         uploaded_version.id,
@@ -540,6 +545,7 @@ async def test_process_document_marks_current_version_processing_before_work() -
     assert version_repository.saved_versions[0].status == DocumentStatus.PROCESSING
     assert version_repository.saved_versions[1].status == DocumentStatus.FAILED
     assert version_repository.saved_versions[1].failure_reason == "Parser failed"
+    assert document.current_version_id == version.id
     assert len(version_repository.saved_versions) == 2
 
 

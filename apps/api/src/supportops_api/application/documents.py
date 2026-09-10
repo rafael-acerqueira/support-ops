@@ -446,6 +446,7 @@ class ProcessDocument:
 
 
 def _sync_document_from_version(document: Document, version: DocumentVersion) -> None:
+    document.current_version_id = version.id
     document.version = version.version
     document.source_file_name = version.source_file_name
     document.content_type = version.content_type
@@ -459,6 +460,7 @@ def _sync_document_from_version(document: Document, version: DocumentVersion) ->
 
 
 def _sync_document_from_uploaded_version(document: Document, version: DocumentVersion) -> None:
+    document.current_version_id = version.id
     document.version = version.version
     document.source_file_name = version.source_file_name
     document.content_type = version.content_type
