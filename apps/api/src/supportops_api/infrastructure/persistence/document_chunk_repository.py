@@ -33,7 +33,7 @@ class PostgresDocumentChunkRepository(KnowledgeSourceRepository):
             .where(
                 DocumentRecord.is_active.is_(True),
                 DocumentRecord.status == DocumentStatus.INDEXED.value,
-                _active_or_legacy_chunk_version_filter(),
+                _current_or_legacy_chunk_version_filter(),
             )
             .order_by(DocumentRecord.updated_at.desc(), DocumentChunkRecord.chunk_index.asc())
             .limit(limit)
@@ -71,7 +71,7 @@ class PostgresDocumentChunkRepository(KnowledgeSourceRepository):
                 DocumentRecord.is_active.is_(True),
                 DocumentRecord.status == DocumentStatus.INDEXED.value,
                 DocumentChunkRecord.embedding.is_not(None),
-                _active_or_legacy_chunk_version_filter(),
+                _current_or_legacy_chunk_version_filter(),
             )
             .order_by(
                 distance.asc(),
@@ -134,11 +134,11 @@ def _vector_distance_expression(embedding: tuple[float, ...]) -> ColumnElement[f
     return DocumentChunkRecord.embedding.op("<=>", return_type=Float())(query_vector)
 
 
-def _active_or_legacy_chunk_version_filter() -> ColumnElement[bool]:
+def _current_or_legacy_chunk_version_filter() -> ColumnElement[bool]:
     return or_(
         DocumentChunkRecord.document_version_id.is_(None),
         and_(
-            DocumentVersionRecord.is_active.is_(True),
+            DocumentRecord.current_version_id == DocumentChunkRecord.document_version_id,
             DocumentVersionRecord.status == DocumentStatus.INDEXED.value,
         ),
     )
