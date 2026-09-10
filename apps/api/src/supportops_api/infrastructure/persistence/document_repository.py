@@ -55,12 +55,13 @@ class PostgresDocumentRepository(DocumentRepository):
     async def list_chunks(self, document_id: UUID) -> list[DocumentChunk]:
         result = await self._session.execute(
             select(DocumentChunkRecord)
+            .join(DocumentRecord, DocumentChunkRecord.document_id == DocumentRecord.id)
             .outerjoin(
                 DocumentVersionRecord,
                 DocumentChunkRecord.document_version_id == DocumentVersionRecord.id,
             )
             .where(DocumentChunkRecord.document_id == document_id)
-            .where(_active_or_legacy_chunk_version_filter())
+            .where(_current_or_legacy_chunk_version_filter())
             .order_by(DocumentChunkRecord.chunk_index.asc())
         )
         return [_record_to_chunk(record) for record in result.scalars()]
@@ -313,11 +314,11 @@ def _chunk_replacement_version_id(chunks: list[DocumentChunk]) -> UUID | None:
     return next(iter(version_ids), None)
 
 
-def _active_or_legacy_chunk_version_filter():
+def _current_or_legacy_chunk_version_filter():
     return or_(
         DocumentChunkRecord.document_version_id.is_(None),
         and_(
-            DocumentVersionRecord.is_active.is_(True),
+            DocumentRecord.current_version_id == DocumentChunkRecord.document_version_id,
             DocumentVersionRecord.status == DocumentStatus.INDEXED.value,
         ),
     )
