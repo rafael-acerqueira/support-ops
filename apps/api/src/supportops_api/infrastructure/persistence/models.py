@@ -5,7 +5,17 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
@@ -192,7 +202,6 @@ class DocumentChunkRecord(Base):
             "document_version_id",
             "chunk_index",
             unique=True,
-            postgresql_where=text("document_version_id is not null"),
         ),
     )
 
@@ -200,10 +209,10 @@ class DocumentChunkRecord(Base):
     document_id: Mapped[UUID] = mapped_column(
         PostgresUUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
     )
-    document_version_id: Mapped[UUID | None] = mapped_column(
+    document_version_id: Mapped[UUID] = mapped_column(
         PostgresUUID(as_uuid=True),
-        ForeignKey("document_versions.id", ondelete="SET NULL"),
-        nullable=True,
+        ForeignKey("document_versions.id", ondelete="CASCADE"),
+        nullable=False,
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -218,4 +227,4 @@ class DocumentChunkRecord(Base):
     )
 
     document: Mapped[DocumentRecord] = relationship(back_populates="chunks")
-    document_version: Mapped[DocumentVersionRecord | None] = relationship(back_populates="chunks")
+    document_version: Mapped[DocumentVersionRecord] = relationship(back_populates="chunks")

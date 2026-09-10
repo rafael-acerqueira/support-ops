@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import and_, delete, or_, select, update
+from sqlalchemy import and_, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from supportops_api.application.documents import DocumentRepository, DocumentVersionRepository
@@ -61,7 +61,7 @@ class PostgresDocumentRepository(DocumentRepository):
                 DocumentChunkRecord.document_version_id == DocumentVersionRecord.id,
             )
             .where(DocumentChunkRecord.document_id == document_id)
-            .where(_current_or_legacy_chunk_version_filter())
+            .where(_current_chunk_version_filter())
             .order_by(DocumentChunkRecord.chunk_index.asc())
         )
         return [_record_to_chunk(record) for record in result.scalars()]
@@ -316,13 +316,10 @@ def _chunk_replacement_version_id(chunks: list[DocumentChunk]) -> UUID | None:
     return next(iter(version_ids), None)
 
 
-def _current_or_legacy_chunk_version_filter():
-    return or_(
-        DocumentChunkRecord.document_version_id.is_(None),
-        and_(
-            DocumentRecord.current_version_id == DocumentChunkRecord.document_version_id,
-            DocumentVersionRecord.status == DocumentStatus.INDEXED.value,
-        ),
+def _current_chunk_version_filter():
+    return and_(
+        DocumentRecord.current_version_id == DocumentChunkRecord.document_version_id,
+        DocumentVersionRecord.status == DocumentStatus.INDEXED.value,
     )
 
 

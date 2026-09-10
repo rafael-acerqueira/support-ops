@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from supportops_api.infrastructure.persistence.document_chunk_repository import (
-    _current_or_legacy_chunk_version_filter,
+    _current_chunk_version_filter,
     _distance_to_relevance,
     _record_to_source,
     _vector_distance_expression,
@@ -76,9 +76,8 @@ def test_vector_distance_expression_returns_float() -> None:
     assert expression.type.python_type is float
 
 
-def test_current_or_legacy_chunk_version_filter_allows_current_versions_and_legacy_chunks() -> None:
-    compiled = str(_current_or_legacy_chunk_version_filter().compile())
+def test_current_chunk_version_filter_requires_current_indexed_version() -> None:
+    compiled = str(_current_chunk_version_filter().compile())
 
-    assert "document_chunks.document_version_id IS NULL" in compiled
     assert "documents.current_version_id = document_chunks.document_version_id" in compiled
     assert "document_versions.status" in compiled

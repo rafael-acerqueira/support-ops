@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Float, and_, literal, or_, select
+from sqlalchemy import Float, and_, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -33,7 +33,7 @@ class PostgresDocumentChunkRepository(KnowledgeSourceRepository):
             .where(
                 DocumentRecord.is_active.is_(True),
                 DocumentRecord.status == DocumentStatus.INDEXED.value,
-                _current_or_legacy_chunk_version_filter(),
+                _current_chunk_version_filter(),
             )
             .order_by(DocumentRecord.updated_at.desc(), DocumentChunkRecord.chunk_index.asc())
             .limit(limit)
@@ -71,7 +71,7 @@ class PostgresDocumentChunkRepository(KnowledgeSourceRepository):
                 DocumentRecord.is_active.is_(True),
                 DocumentRecord.status == DocumentStatus.INDEXED.value,
                 DocumentChunkRecord.embedding.is_not(None),
-                _current_or_legacy_chunk_version_filter(),
+                _current_chunk_version_filter(),
             )
             .order_by(
                 distance.asc(),
@@ -134,11 +134,8 @@ def _vector_distance_expression(embedding: tuple[float, ...]) -> ColumnElement[f
     return DocumentChunkRecord.embedding.op("<=>", return_type=Float())(query_vector)
 
 
-def _current_or_legacy_chunk_version_filter() -> ColumnElement[bool]:
-    return or_(
-        DocumentChunkRecord.document_version_id.is_(None),
-        and_(
-            DocumentRecord.current_version_id == DocumentChunkRecord.document_version_id,
-            DocumentVersionRecord.status == DocumentStatus.INDEXED.value,
-        ),
+def _current_chunk_version_filter() -> ColumnElement[bool]:
+    return and_(
+        DocumentRecord.current_version_id == DocumentChunkRecord.document_version_id,
+        DocumentVersionRecord.status == DocumentStatus.INDEXED.value,
     )
