@@ -92,15 +92,38 @@ def create_document() -> Document:
     )
 
 
+async def add_current_version(
+    repository: InMemoryDocumentRepository,
+    version_repository: InMemoryDocumentVersionRepository,
+    document: Document,
+) -> DocumentVersion:
+    version = DocumentVersion.create(
+        document_id=document.id,
+        version=document.version,
+        source_file_name=document.source_file_name,
+        content_type=document.content_type,
+        size_bytes=document.size_bytes,
+        storage_key=document.storage_key or "",
+    )
+    document.current_version_id = version.id
+    await repository.save(document)
+    await version_repository.add(version)
+    return version
+
+
 @pytest.mark.asyncio
 async def test_inline_document_processing_queue_processes_document_immediately() -> None:
     repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
     document = create_document()
     await repository.add(document)
+    await add_current_version(repository, version_repository, document)
 
-    enqueued = await InlineDocumentProcessingQueue(repository, FakeDocumentProcessor()).enqueue(
-        document.id
-    )
+    enqueued = await InlineDocumentProcessingQueue(
+        repository,
+        FakeDocumentProcessor(),
+        version_repository=version_repository,
+    ).enqueue(document.id)
 
     assert enqueued.document_id == document.id
     assert enqueued.task_id == f"inline:{document.id}"
@@ -112,13 +135,16 @@ async def test_inline_document_processing_queue_processes_document_immediately()
 @pytest.mark.asyncio
 async def test_inline_document_processing_queue_can_generate_embeddings() -> None:
     repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
     document = create_document()
     await repository.add(document)
+    await add_current_version(repository, version_repository, document)
 
     await InlineDocumentProcessingQueue(
         repository,
         FakeDocumentProcessor(),
         FakeEmbeddingGenerator(),
+        version_repository=version_repository,
     ).enqueue(document.id)
 
     assert repository.chunks[document.id][0].embedding == (0.4, 0.8)
@@ -129,16 +155,8 @@ async def test_inline_document_processing_queue_syncs_current_version() -> None:
     repository = InMemoryDocumentRepository()
     version_repository = InMemoryDocumentVersionRepository()
     document = create_document()
-    version = DocumentVersion.create(
-        document_id=document.id,
-        version=document.version,
-        source_file_name=document.source_file_name,
-        content_type=document.content_type,
-        size_bytes=document.size_bytes,
-        storage_key=document.storage_key or "",
-    )
     await repository.add(document)
-    await version_repository.add(version)
+    version = await add_current_version(repository, version_repository, document)
 
     await InlineDocumentProcessingQueue(
         repository,

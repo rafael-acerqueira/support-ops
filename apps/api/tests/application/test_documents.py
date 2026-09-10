@@ -11,6 +11,7 @@ from supportops_api.application.documents import (
     CreateDocumentVersion,
     CreateDocumentVersionInput,
     DeactivateDocument,
+    DocumentCurrentVersionNotFoundError,
     DocumentNotFoundError,
     DocumentVersionNotFoundError,
     GeneratedEmbedding,
@@ -589,6 +590,34 @@ async def test_process_document_prefers_current_version_id() -> None:
         current_version.id,
         current_version.id,
     ]
+
+
+@pytest.mark.asyncio
+async def test_process_document_requires_current_version_for_stored_document() -> None:
+    repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = Document.create(
+        name="Refund Policy",
+        document_type=DocumentType.INTERNAL_POLICY,
+        product_area=ProductArea.BILLING,
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=1024,
+        storage_key="documents/refund-policy/v1.md",
+    )
+    await repository.add(document)
+
+    with pytest.raises(DocumentCurrentVersionNotFoundError) as error:
+        await ProcessDocument(
+            repository,
+            SuccessfulDocumentProcessor(),
+            version_repository=version_repository,
+        ).execute(document.id)
+
+    assert error.value.document_id == document.id
+    assert document.status == DocumentStatus.FAILED
+    assert document.failure_reason == "Current document version is required for processing"
+    assert repository.chunks.get(document.id) is None
 
 
 @pytest.mark.asyncio

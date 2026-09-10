@@ -25,6 +25,12 @@ class DocumentVersionNotFoundError(Exception):
         self.document_version_id = document_version_id
 
 
+class DocumentCurrentVersionNotFoundError(Exception):
+    def __init__(self, document_id: UUID) -> None:
+        super().__init__(f"Current document version not found: {document_id}")
+        self.document_id = document_id
+
+
 class EmbeddingProviderError(Exception):
     pass
 
@@ -358,6 +364,11 @@ class ProcessDocument:
         document.start_processing()
         await self._repository.save(document)
         current_version = await self._sync_processing_version(document)
+        if document.storage_key is not None and current_version is None:
+            reason = "Current document version is required for processing"
+            document.mark_failed(reason)
+            await self._repository.save(document)
+            raise DocumentCurrentVersionNotFoundError(document.id)
 
         try:
             chunks = await self._processor.process(document)
