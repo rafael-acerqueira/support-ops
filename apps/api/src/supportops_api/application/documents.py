@@ -83,7 +83,11 @@ class DocumentVersionRepository(Protocol):
 
 
 class DocumentProcessor(Protocol):
-    async def process(self, document: Document) -> list[DocumentChunk]:
+    async def process(
+        self,
+        document: Document,
+        document_version: DocumentVersion | None = None,
+    ) -> list[DocumentChunk]:
         pass
 
 
@@ -371,8 +375,7 @@ class ProcessDocument:
             raise DocumentCurrentVersionNotFoundError(document.id)
 
         try:
-            chunks = await self._processor.process(document)
-            chunks = _attach_chunks_to_version(chunks, current_version)
+            chunks = await self._processor.process(document, current_version)
             chunks = await self._generate_embeddings(chunks)
             await self._repository.replace_chunks(document.id, chunks)
             await self._mark_processed(document, current_version, chunk_count=len(chunks))
@@ -493,30 +496,6 @@ def _sync_document_from_uploaded_version(document: Document, version: DocumentVe
     document.failure_reason = version.failure_reason
     document.last_processed_at = version.last_processed_at
     document.updated_at = version.updated_at
-
-
-def _attach_chunks_to_version(
-    chunks: list[DocumentChunk],
-    version: DocumentVersion | None,
-) -> list[DocumentChunk]:
-    if version is None:
-        return chunks
-
-    return [
-        DocumentChunk(
-            id=chunk.id,
-            document_id=chunk.document_id,
-            document_version_id=version.id,
-            chunk_index=chunk.chunk_index,
-            content=chunk.content,
-            metadata=chunk.metadata,
-            embedding=chunk.embedding,
-            embedding_provider=chunk.embedding_provider,
-            embedding_model=chunk.embedding_model,
-            created_at=chunk.created_at,
-        )
-        for chunk in chunks
-    ]
 
 
 def _next_version_label(versions: list[DocumentVersion]) -> str:

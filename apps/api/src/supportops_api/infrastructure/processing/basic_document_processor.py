@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from supportops_api.application.documents import DocumentProcessor, DocumentStorage
-from supportops_api.domain.documents import Document, DocumentChunk
+from supportops_api.domain.documents import Document, DocumentChunk, DocumentVersion
 
 
 class BasicDocumentProcessor(DocumentProcessor):
@@ -12,13 +12,23 @@ class BasicDocumentProcessor(DocumentProcessor):
         self._storage = storage
         self._max_chunk_chars = max_chunk_chars
 
-    async def process(self, document: Document) -> list[DocumentChunk]:
-        if not document.storage_key:
-            raise ValueError("Document has no storage key")
-        if not _is_supported_content_type(document.content_type):
-            raise ValueError(f"Unsupported content type: {document.content_type}")
+    async def process(
+        self,
+        document: Document,
+        document_version: DocumentVersion | None = None,
+    ) -> list[DocumentChunk]:
+        storage_key = document_version.storage_key if document_version else document.storage_key
+        content_type = document_version.content_type if document_version else document.content_type
+        source_file_name = (
+            document_version.source_file_name if document_version else document.source_file_name
+        )
 
-        with await self._storage.open(document.storage_key) as file:
+        if not storage_key:
+            raise ValueError("Document has no storage key")
+        if not _is_supported_content_type(content_type):
+            raise ValueError(f"Unsupported content type: {content_type}")
+
+        with await self._storage.open(storage_key) as file:
             content = file.read()
 
         text = content.decode("utf-8").strip()
@@ -28,9 +38,10 @@ class BasicDocumentProcessor(DocumentProcessor):
         return [
             DocumentChunk(
                 document_id=document.id,
+                document_version_id=document_version.id if document_version else None,
                 chunk_index=index,
                 content=chunk,
-                metadata={"source_file_name": document.source_file_name},
+                metadata={"source_file_name": source_file_name},
             )
             for index, chunk in enumerate(_chunk_text(text, self._max_chunk_chars))
         ]

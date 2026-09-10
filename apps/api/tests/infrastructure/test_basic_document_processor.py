@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 
 from supportops_api.application.documents import StoredDocumentFile
-from supportops_api.domain.documents import Document, DocumentType, ProductArea
+from supportops_api.domain.documents import Document, DocumentType, DocumentVersion, ProductArea
 from supportops_api.infrastructure.processing import BasicDocumentProcessor
 
 
@@ -39,6 +39,21 @@ def create_document(*, storage_key: str | None = "fake/refund-policy.md") -> Doc
     )
 
 
+def create_document_version(
+    document: Document,
+    *,
+    storage_key: str = "fake/refund-policy.md",
+) -> DocumentVersion:
+    return DocumentVersion.create(
+        document_id=document.id,
+        version=document.version,
+        source_file_name=document.source_file_name,
+        content_type=document.content_type,
+        size_bytes=document.size_bytes,
+        storage_key=storage_key,
+    )
+
+
 @pytest.mark.asyncio
 async def test_basic_document_processor_creates_chunks_from_text() -> None:
     storage = InMemoryDocumentStorage()
@@ -48,12 +63,14 @@ async def test_basic_document_processor_creates_chunks_from_text() -> None:
         content=BytesIO(b"First paragraph.\n\nSecond paragraph."),
     )
     document = create_document(storage_key=stored_file.storage_key)
+    version = create_document_version(document, storage_key=stored_file.storage_key)
 
-    chunks = await BasicDocumentProcessor(storage, max_chunk_chars=20).process(document)
+    chunks = await BasicDocumentProcessor(storage, max_chunk_chars=20).process(document, version)
 
     assert [chunk.content for chunk in chunks] == ["First paragraph.", "Second paragraph."]
     assert [chunk.chunk_index for chunk in chunks] == [0, 1]
     assert chunks[0].document_id == document.id
+    assert chunks[0].document_version_id == version.id
     assert chunks[0].metadata == {"source_file_name": "refund-policy.md"}
 
 

@@ -71,8 +71,19 @@ class InMemoryDocumentVersionRepository:
 
 
 class FakeDocumentProcessor:
-    async def process(self, document: Document) -> list[DocumentChunk]:
-        return [DocumentChunk(document_id=document.id, chunk_index=0, content="Processed chunk")]
+    async def process(
+        self,
+        document: Document,
+        document_version: DocumentVersion | None = None,
+    ) -> list[DocumentChunk]:
+        return [
+            DocumentChunk(
+                document_id=document.id,
+                document_version_id=document_version.id if document_version else None,
+                chunk_index=0,
+                content="Processed chunk",
+            )
+        ]
 
 
 class FakeEmbeddingGenerator:

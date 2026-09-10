@@ -105,15 +105,21 @@ class InMemoryDocumentVersionRepository:
 
 
 class SuccessfulDocumentProcessor:
-    async def process(self, document: Document) -> list[DocumentChunk]:
+    async def process(
+        self,
+        document: Document,
+        document_version: DocumentVersion | None = None,
+    ) -> list[DocumentChunk]:
         return [
             DocumentChunk(
                 document_id=document.id,
+                document_version_id=document_version.id if document_version else None,
                 chunk_index=0,
                 content="Refund requests must include a reason.",
             ),
             DocumentChunk(
                 document_id=document.id,
+                document_version_id=document_version.id if document_version else None,
                 chunk_index=1,
                 content="Enterprise refunds require approval.",
             ),
@@ -121,7 +127,11 @@ class SuccessfulDocumentProcessor:
 
 
 class FailingDocumentProcessor:
-    async def process(self, document: Document) -> list[DocumentChunk]:
+    async def process(
+        self,
+        document: Document,
+        document_version: DocumentVersion | None = None,
+    ) -> list[DocumentChunk]:
         raise RuntimeError("Parser failed")
 
 
