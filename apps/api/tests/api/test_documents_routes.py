@@ -446,6 +446,38 @@ async def test_list_document_chunks(
 
 
 @pytest.mark.asyncio
+async def test_list_document_chunks_prefers_current_version_chunks(
+    api_client: tuple[
+        httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession
+    ],
+) -> None:
+    client, repository, _version_repository, _storage, _processing_queue, _session = api_client
+    document = create_document(repository)
+    current_version_id = uuid4()
+    document.current_version_id = current_version_id
+    previous_chunk = DocumentChunk(
+        document_id=document.id,
+        document_version_id=uuid4(),
+        chunk_index=0,
+        content="Previous refund policy",
+    )
+    current_chunk = DocumentChunk(
+        document_id=document.id,
+        document_version_id=current_version_id,
+        chunk_index=0,
+        content="Current refund policy",
+    )
+    repository.chunks[document.id] = [previous_chunk, current_chunk]
+
+    response = await client.get(f"/api/documents/{document.id}/chunks")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert [chunk["id"] for chunk in body] == [str(current_chunk.id)]
+    assert body[0]["document_version_id"] == str(current_version_id)
+
+
+@pytest.mark.asyncio
 async def test_list_document_versions(
     api_client: tuple[
         httpx.AsyncClient, InMemoryDocumentRepository, InMemoryDocumentStorage, FakeSession

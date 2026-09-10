@@ -279,6 +279,12 @@ class ListDocumentChunks:
         if document is None:
             raise DocumentNotFoundError(document_id)
 
+        if document.current_version_id is not None:
+            return await self._repository.list_chunks_for_version(
+                document.id,
+                document.current_version_id,
+            )
+
         return await self._repository.list_chunks(document_id)
 
 

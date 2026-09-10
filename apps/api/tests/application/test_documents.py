@@ -348,6 +348,35 @@ async def test_list_document_chunks_returns_document_chunks() -> None:
 
 
 @pytest.mark.asyncio
+async def test_list_document_chunks_prefers_current_version_chunks() -> None:
+    repository = InMemoryDocumentRepository()
+    document = create_uploaded_document()
+    current_version_id = uuid4()
+    previous_version_id = uuid4()
+    document.current_version_id = current_version_id
+    chunks = [
+        DocumentChunk(
+            document_id=document.id,
+            document_version_id=previous_version_id,
+            chunk_index=0,
+            content="Previous refund policy",
+        ),
+        DocumentChunk(
+            document_id=document.id,
+            document_version_id=current_version_id,
+            chunk_index=0,
+            content="Current refund policy",
+        ),
+    ]
+    await repository.add(document)
+    await repository.replace_chunks(document.id, chunks)
+
+    listed_chunks = await ListDocumentChunks(repository).execute(document.id)
+
+    assert listed_chunks == [chunks[1]]
+
+
+@pytest.mark.asyncio
 async def test_list_document_version_chunks_returns_chunks_for_version() -> None:
     document_repository = InMemoryDocumentRepository()
     version_repository = InMemoryDocumentVersionRepository()
