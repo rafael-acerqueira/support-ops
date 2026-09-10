@@ -80,6 +80,8 @@ class PostgresDocumentRepository(DocumentRepository):
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
         if any(chunk.document_id != document_id for chunk in chunks):
             raise ValueError("All chunks must belong to the document being replaced")
+        if any(chunk.document_version_id is None for chunk in chunks):
+            raise ValueError("All persisted chunks must belong to a document version")
 
         replacement_version_id = _chunk_replacement_version_id(chunks)
 

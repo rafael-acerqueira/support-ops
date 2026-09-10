@@ -132,12 +132,6 @@ def test_chunk_record_roundtrip_preserves_domain_values() -> None:
     assert mapped_chunk.embedding_model == "text-embedding-3-small"
 
 
-def test_chunk_replacement_version_id_returns_none_for_legacy_chunks() -> None:
-    chunks = [DocumentChunk(document_id=uuid4(), chunk_index=0, content="Legacy chunk")]
-
-    assert _chunk_replacement_version_id(chunks) is None
-
-
 def test_chunk_replacement_version_id_returns_common_version() -> None:
     document_id = uuid4()
     version_id = uuid4()
@@ -192,6 +186,16 @@ async def test_replace_chunks_rejects_chunks_from_another_document() -> None:
 
 
 @pytest.mark.asyncio
+async def test_replace_chunks_rejects_chunks_without_document_version() -> None:
+    repository = PostgresDocumentRepository(session=None)  # type: ignore[arg-type]
+    document_id = uuid4()
+    chunks = [DocumentChunk(document_id=document_id, chunk_index=0, content="Legacy chunk")]
+
+    with pytest.raises(ValueError, match="belong to a document version"):
+        await repository.replace_chunks(document_id, chunks)
+
+
+@pytest.mark.asyncio
 async def test_replace_chunks_rejects_chunks_from_multiple_document_versions() -> None:
     repository = PostgresDocumentRepository(session=None)  # type: ignore[arg-type]
     document_id = uuid4()
@@ -223,10 +227,13 @@ async def test_postgres_document_repository_persists_document_workflow() -> None
     engine = create_async_engine(get_database_url(), pool_pre_ping=True)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     document = create_indexed_document()
+    version = create_indexed_document_version(document.id)
+    document.current_version_id = version.id
     document.deactivate()
     chunks = [
         DocumentChunk(
             document_id=document.id,
+            document_version_id=version.id,
             chunk_index=0,
             content="First chunk",
             embedding=create_test_embedding(0.1),
@@ -235,6 +242,7 @@ async def test_postgres_document_repository_persists_document_workflow() -> None
         ),
         DocumentChunk(
             document_id=document.id,
+            document_version_id=version.id,
             chunk_index=1,
             content="Second chunk",
             embedding=create_test_embedding(0.2),
@@ -247,6 +255,7 @@ async def test_postgres_document_repository_persists_document_workflow() -> None
         async with session_factory() as session:
             repository = PostgresDocumentRepository(session)
             await repository.add(document)
+            await PostgresDocumentVersionRepository(session).add(version)
             await repository.replace_chunks(document.id, chunks)
             await session.commit()
 
@@ -275,6 +284,11 @@ async def test_postgres_document_repository_persists_document_workflow() -> None
         async with session_factory() as session:
             await session.execute(
                 delete(DocumentChunkRecord).where(DocumentChunkRecord.document_id == document.id)
+            )
+            await session.execute(
+                delete(DocumentVersionRecord).where(
+                    DocumentVersionRecord.document_id == document.id
+                )
             )
             await session.execute(delete(DocumentRecord).where(DocumentRecord.id == document.id))
             await session.commit()
