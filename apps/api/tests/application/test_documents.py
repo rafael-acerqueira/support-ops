@@ -512,6 +512,57 @@ async def test_process_document_uses_document_snapshot_version() -> None:
 
 
 @pytest.mark.asyncio
+async def test_process_document_prefers_current_version_id() -> None:
+    repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = Document.create(
+        name="Refund Policy",
+        document_type=DocumentType.INTERNAL_POLICY,
+        product_area=ProductArea.BILLING,
+        source_file_name="refund-policy-v2.md",
+        content_type="text/markdown",
+        size_bytes=2048,
+        storage_key="documents/refund-policy/v2.md",
+    )
+    document.version = "v2"
+    snapshot_match = DocumentVersion.create(
+        document_id=document.id,
+        version="v2",
+        source_file_name=document.source_file_name,
+        content_type=document.content_type,
+        size_bytes=document.size_bytes,
+        storage_key=document.storage_key or "",
+    )
+    current_version = DocumentVersion.create(
+        document_id=document.id,
+        version="v3",
+        source_file_name="refund-policy-v3.md",
+        content_type="text/markdown",
+        size_bytes=4096,
+        storage_key="documents/refund-policy/v3.md",
+    )
+    document.current_version_id = current_version.id
+    await repository.add(document)
+    await version_repository.add(snapshot_match)
+    await version_repository.add(current_version)
+
+    await ProcessDocument(
+        repository,
+        SuccessfulDocumentProcessor(),
+        version_repository=version_repository,
+    ).execute(document.id)
+
+    assert current_version.status == DocumentStatus.INDEXED
+    assert snapshot_match.status == DocumentStatus.UPLOADED
+    assert document.current_version_id == current_version.id
+    assert document.version == "v3"
+    assert [chunk.document_version_id for chunk in repository.chunks[document.id]] == [
+        current_version.id,
+        current_version.id,
+    ]
+
+
+@pytest.mark.asyncio
 async def test_process_document_marks_current_version_processing_before_work() -> None:
     repository = InMemoryDocumentRepository()
     version_repository = InMemoryDocumentVersionRepository()

@@ -73,6 +73,11 @@ async def _document_processing_version(
     document: Document,
     version_repository: DocumentVersionRepository,
 ) -> DocumentVersion | None:
+    if document.current_version_id is not None:
+        version = await version_repository.get(document.current_version_id)
+        if version is not None and version.document_id == document.id:
+            return version
+
     if document.storage_key is None:
         return None
 
