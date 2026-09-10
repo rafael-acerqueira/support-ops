@@ -27,6 +27,7 @@ class CreateDocumentRequest(BaseModel):
 
 class DocumentResponse(BaseModel):
     id: UUID
+    current_version_id: UUID | None
     name: str
     document_type: DocumentType
     product_area: ProductArea
@@ -53,6 +54,7 @@ class DocumentResponse(BaseModel):
         version = processing_version
         return cls(
             id=document.id,
+            current_version_id=version.id if version else document.current_version_id,
             name=document.name,
             document_type=document.document_type,
             product_area=document.product_area,

@@ -27,6 +27,7 @@ def test_document_response_uses_document_processing_fields_by_default() -> None:
 
     response = DocumentResponse.from_domain(document)
 
+    assert response.current_version_id is None
     assert response.version == "v1"
     assert response.status == DocumentStatus.INDEXED
     assert response.source_file_name == "refund-policy-v1.md"
@@ -48,10 +49,12 @@ def test_document_response_can_use_document_version_processing_fields() -> None:
     )
     version.start_processing()
     version.mark_indexed(chunk_count=5)
+    document.current_version_id = version.id
 
     response = DocumentResponse.from_domain(document, processing_version=version)
 
     assert response.id == document.id
+    assert response.current_version_id == version.id
     assert response.name == document.name
     assert response.document_type == document.document_type
     assert response.product_area == document.product_area

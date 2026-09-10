@@ -32,6 +32,7 @@ type DocumentReadinessTone = 'success' | 'warning' | 'error';
 
 type KnowledgeDocument = {
   id: string;
+  current_version_id: string | null;
   name: string;
   document_type: DocumentType;
   product_area: ProductArea;
