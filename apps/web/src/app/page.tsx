@@ -1082,12 +1082,15 @@ export default function DocumentsPage() {
                   <div className="version-list">
                     {selectedDocumentVersions.map((version) => {
                       const VersionStatusIcon = statusIcons[version.status];
+                      const isCurrentVersion = selectedDocument.current_version_id === version.id;
                       const canActivate = version.status === 'indexed' && !version.is_active;
                       const isVersionBusy = busyVersionId === version.id;
 
                       return (
                         <div
-                          className={`version-row ${version.is_active ? 'active' : ''}`}
+                          className={`version-row ${version.is_active ? 'active' : ''} ${
+                            isCurrentVersion ? 'current' : ''
+                          }`}
                           key={version.id}
                         >
                           <div className="version-summary">
@@ -1107,8 +1110,8 @@ export default function DocumentsPage() {
                             <span>{formatDate(version.activated_at ?? version.updated_at)}</span>
                           </div>
                           <div className="version-actions">
-                            {version.is_active ? (
-                              <strong>Active</strong>
+                            {isCurrentVersion ? (
+                              <strong>{version.is_active ? 'Current active' : 'Current'}</strong>
                             ) : (
                               <button
                                 className="secondary-button compact"

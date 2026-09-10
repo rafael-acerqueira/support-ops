@@ -868,6 +868,11 @@ tbody tr:last-child td {
   background: rgba(16, 185, 129, 0.08);
 }
 
+.version-row.current {
+  border-color: rgba(14, 165, 233, 0.7);
+  background: rgba(14, 165, 233, 0.1);
+}
+
 .version-summary {
   min-width: 0;
 }
@@ -915,10 +920,10 @@ tbody tr:last-child td {
 }
 
 .version-actions strong {
-  border: 1px solid #10b981;
+  border: 1px solid #0ea5e9;
   border-radius: 16px;
-  background: rgba(16, 185, 129, 0.2);
-  color: #10b981;
+  background: rgba(14, 165, 233, 0.18);
+  color: #7dd3fc;
   padding: 4px 8px;
   font-size: 11px;
   line-height: 1.4;
