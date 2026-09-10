@@ -109,6 +109,11 @@ class DocumentRecord(Base):
     tags: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     source_file_name: Mapped[str] = mapped_column(String(512), nullable=False)
     storage_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    current_version_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("document_versions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     content_type: Mapped[str] = mapped_column(String(128), nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -127,7 +132,13 @@ class DocumentRecord(Base):
         back_populates="document", cascade="all, delete-orphan"
     )
     versions: Mapped[list[DocumentVersionRecord]] = relationship(
-        back_populates="document", cascade="all, delete-orphan"
+        back_populates="document",
+        cascade="all, delete-orphan",
+        foreign_keys="DocumentVersionRecord.document_id",
+    )
+    current_version: Mapped[DocumentVersionRecord | None] = relationship(
+        foreign_keys=[current_version_id],
+        post_update=True,
     )
 
 
@@ -166,7 +177,10 @@ class DocumentVersionRecord(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    document: Mapped[DocumentRecord] = relationship(back_populates="versions")
+    document: Mapped[DocumentRecord] = relationship(
+        back_populates="versions",
+        foreign_keys=[document_id],
+    )
     chunks: Mapped[list[DocumentChunkRecord]] = relationship(back_populates="document_version")
 
 

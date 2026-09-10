@@ -28,6 +28,7 @@ def test_document_starts_uploaded_and_normalizes_tags() -> None:
     assert document.status == DocumentStatus.UPLOADED
     assert document.version == "v1"
     assert document.is_active is True
+    assert document.current_version_id is None
     assert document.tags == ("enterprise", "refund")
     assert document.storage_key == "documents/refund-policy.md"
 

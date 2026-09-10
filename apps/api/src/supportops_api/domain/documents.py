@@ -62,6 +62,7 @@ class Document:
     size_bytes: int
     tags: tuple[str, ...] = field(default_factory=tuple)
     storage_key: str | None = None
+    current_version_id: UUID | None = None
     id: UUID = field(default_factory=uuid4)
     version: str = "v1"
     status: DocumentStatus = DocumentStatus.UPLOADED
