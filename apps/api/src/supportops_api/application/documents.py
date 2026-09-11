@@ -209,7 +209,7 @@ class CreateDocumentVersion:
             size_bytes=data.size_bytes,
             storage_key=data.storage_key,
         )
-        _sync_document_from_uploaded_version(document, version)
+        _sync_document_snapshot_from_version(document, version)
 
         await self._version_repository.add(version)
         await self._document_repository.save(document)
@@ -273,7 +273,7 @@ class ActivateDocumentVersion:
 
         await self._version_repository.deactivate_all_for_document(document.id)
         version.activate()
-        _sync_document_from_version(document, version)
+        _sync_document_snapshot_from_version(document, version)
 
         await self._version_repository.save(version)
         await self._document_repository.save(document)
@@ -435,7 +435,7 @@ class ProcessDocument:
         await self._version_repository.deactivate_all_for_document(document.id)
         version.activate()
         await self._version_repository.save(version)
-        _sync_document_from_version(document, version)
+        _sync_document_snapshot_from_version(document, version)
 
     async def _mark_failed(
         self,
@@ -449,7 +449,7 @@ class ProcessDocument:
 
         version.mark_failed(reason)
         await self._version_repository.save(version)
-        _sync_document_from_version(document, version)
+        _sync_document_snapshot_from_version(document, version)
 
     async def _find_current_version(self, document: Document) -> DocumentVersion | None:
         if self._version_repository is None:
@@ -470,21 +470,7 @@ class ProcessDocument:
         )
 
 
-def _sync_document_from_version(document: Document, version: DocumentVersion) -> None:
-    document.current_version_id = version.id
-    document.version = version.version
-    document.source_file_name = version.source_file_name
-    document.content_type = version.content_type
-    document.size_bytes = version.size_bytes
-    document.storage_key = version.storage_key
-    document.status = version.status
-    document.chunk_count = version.chunk_count
-    document.failure_reason = version.failure_reason
-    document.last_processed_at = version.last_processed_at
-    document.updated_at = version.updated_at
-
-
-def _sync_document_from_uploaded_version(document: Document, version: DocumentVersion) -> None:
+def _sync_document_snapshot_from_version(document: Document, version: DocumentVersion) -> None:
     document.current_version_id = version.id
     document.version = version.version
     document.source_file_name = version.source_file_name
