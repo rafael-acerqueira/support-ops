@@ -327,8 +327,7 @@ async def test_list_documents_uses_document_version_processing_fields(
     client, repository, version_repository, _storage, _processing_queue, _session = api_client
     document = create_document(repository)
     version = create_indexed_version(version_repository, document.id)
-    document.version = version.version
-    document.storage_key = version.storage_key
+    document.current_version_id = version.id
 
     response = await client.get("/api/documents")
 
@@ -365,8 +364,7 @@ async def test_get_document_uses_document_version_processing_fields(
     client, repository, version_repository, _storage, _processing_queue, _session = api_client
     document = create_document(repository)
     version = create_indexed_version(version_repository, document.id)
-    document.version = version.version
-    document.storage_key = version.storage_key
+    document.current_version_id = version.id
 
     response = await client.get(f"/api/documents/{document.id}")
 
