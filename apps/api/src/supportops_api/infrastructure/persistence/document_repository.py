@@ -52,20 +52,6 @@ class PostgresDocumentRepository(DocumentRepository):
         )
         return [_record_to_document(record) for record in result.scalars()]
 
-    async def list_chunks(self, document_id: UUID) -> list[DocumentChunk]:
-        result = await self._session.execute(
-            select(DocumentChunkRecord)
-            .join(DocumentRecord, DocumentChunkRecord.document_id == DocumentRecord.id)
-            .outerjoin(
-                DocumentVersionRecord,
-                DocumentChunkRecord.document_version_id == DocumentVersionRecord.id,
-            )
-            .where(DocumentChunkRecord.document_id == document_id)
-            .where(_current_chunk_version_filter())
-            .order_by(DocumentChunkRecord.chunk_index.asc())
-        )
-        return [_record_to_chunk(record) for record in result.scalars()]
-
     async def list_chunks_for_version(
         self, document_id: UUID, document_version_id: UUID
     ) -> list[DocumentChunk]:

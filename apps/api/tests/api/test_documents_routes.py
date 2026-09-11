@@ -162,9 +162,6 @@ class InMemoryDocumentRepository(DocumentRepository):
     async def list_all(self) -> list[Document]:
         return list(self.documents.values())
 
-    async def list_chunks(self, document_id: UUID) -> list[DocumentChunk]:
-        return self.chunks.get(document_id, [])
-
     async def list_chunks_for_version(
         self, document_id: UUID, document_version_id: UUID
     ) -> list[DocumentChunk]:

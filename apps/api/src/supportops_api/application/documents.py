@@ -48,9 +48,6 @@ class DocumentRepository(Protocol):
     async def list_all(self) -> list[Document]:
         pass
 
-    async def list_chunks(self, document_id: UUID) -> list[DocumentChunk]:
-        pass
-
     async def list_chunks_for_version(
         self, document_id: UUID, document_version_id: UUID
     ) -> list[DocumentChunk]:
