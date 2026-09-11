@@ -73,11 +73,6 @@ class DocumentVersionRepository(Protocol):
     async def list_for_document(self, document_id: UUID) -> list[DocumentVersion]:
         pass
 
-    async def get_for_document_snapshot(
-        self, document_id: UUID, version: str, storage_key: str
-    ) -> DocumentVersion | None:
-        pass
-
     async def deactivate_all_for_document(self, document_id: UUID) -> None:
         pass
 

@@ -88,14 +88,14 @@ class FakeDocumentProcessingQueue:
         )
 
     async def _processing_version(self, document: Document) -> DocumentVersion | None:
-        if document.storage_key is None:
+        if document.current_version_id is None:
             return None
 
-        return await self._version_repository.get_for_document_snapshot(
-            document.id,
-            document.version,
-            document.storage_key,
-        )
+        version = await self._version_repository.get(document.current_version_id)
+        if version is not None and version.document_id == document.id:
+            return version
+
+        return None
 
     async def _mark_version_failed(self, document: Document) -> None:
         version = await self._processing_version(document)
@@ -193,19 +193,6 @@ class InMemoryDocumentVersionRepository(DocumentVersionRepository):
 
     async def list_for_document(self, document_id: UUID) -> list[DocumentVersion]:
         return [version for version in self.versions.values() if version.document_id == document_id]
-
-    async def get_for_document_snapshot(
-        self, document_id: UUID, version_label: str, storage_key: str
-    ) -> DocumentVersion | None:
-        for version in self.versions.values():
-            if (
-                version.document_id == document_id
-                and version.version == version_label
-                and version.storage_key == storage_key
-            ):
-                return version
-
-        return None
 
     async def deactivate_all_for_document(self, document_id: UUID) -> None:
         for version in self.versions.values():
