@@ -503,6 +503,7 @@ async def test_process_document_syncs_current_version_when_version_repository_is
         size_bytes=document.size_bytes,
         storage_key=document.storage_key or "",
     )
+    document.current_version_id = version.id
     await repository.add(document)
     await version_repository.add(version)
 
@@ -527,7 +528,7 @@ async def test_process_document_syncs_current_version_when_version_repository_is
 
 
 @pytest.mark.asyncio
-async def test_process_document_uses_document_snapshot_version() -> None:
+async def test_process_document_rejects_snapshot_match_without_current_version() -> None:
     repository = InMemoryDocumentRepository()
     version_repository = InMemoryDocumentVersionRepository()
     document = Document.create(
@@ -554,20 +555,18 @@ async def test_process_document_uses_document_snapshot_version() -> None:
     await version_repository.add(active_version)
     await version_repository.add(uploaded_version)
 
-    await ProcessDocument(
-        repository,
-        SuccessfulDocumentProcessor(),
-        version_repository=version_repository,
-    ).execute(document.id)
+    with pytest.raises(DocumentCurrentVersionNotFoundError):
+        await ProcessDocument(
+            repository,
+            SuccessfulDocumentProcessor(),
+            version_repository=version_repository,
+        ).execute(document.id)
 
-    assert uploaded_version.status == DocumentStatus.INDEXED
-    assert uploaded_version.is_active is True
-    assert active_version.is_active is False
-    assert document.current_version_id == uploaded_version.id
-    assert [chunk.document_version_id for chunk in repository.chunks[document.id]] == [
-        uploaded_version.id,
-        uploaded_version.id,
-    ]
+    assert uploaded_version.status == DocumentStatus.UPLOADED
+    assert uploaded_version.is_active is False
+    assert active_version.is_active is True
+    assert document.current_version_id is None
+    assert repository.chunks.get(document.id) is None
 
 
 @pytest.mark.asyncio
@@ -670,6 +669,7 @@ async def test_process_document_marks_current_version_processing_before_work() -
         size_bytes=document.size_bytes,
         storage_key=document.storage_key or "",
     )
+    document.current_version_id = version.id
     await repository.add(document)
     await version_repository.add(version)
 

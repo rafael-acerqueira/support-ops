@@ -455,19 +455,14 @@ class ProcessDocument:
         if self._version_repository is None:
             return None
 
-        if document.current_version_id is not None:
-            version = await self._version_repository.get(document.current_version_id)
-            if version is not None and version.document_id == document.id:
-                return version
-
-        if document.storage_key is None:
+        if document.current_version_id is None:
             return None
 
-        return await self._version_repository.get_for_document_snapshot(
-            document.id,
-            document.version,
-            document.storage_key,
-        )
+        version = await self._version_repository.get(document.current_version_id)
+        if version is not None and version.document_id == document.id:
+            return version
+
+        return None
 
 
 def _sync_document_snapshot_from_version(document: Document, version: DocumentVersion) -> None:
