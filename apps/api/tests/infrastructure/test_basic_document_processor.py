@@ -75,22 +75,14 @@ async def test_basic_document_processor_creates_chunks_from_text() -> None:
 
 
 @pytest.mark.asyncio
-async def test_basic_document_processor_requires_storage_key() -> None:
-    storage = InMemoryDocumentStorage()
-    document = create_document(storage_key=None)
-
-    with pytest.raises(ValueError, match="no storage key"):
-        await BasicDocumentProcessor(storage).process(document)
-
-
-@pytest.mark.asyncio
 async def test_basic_document_processor_rejects_unsupported_content_type() -> None:
     storage = InMemoryDocumentStorage()
     document = create_document()
-    document.content_type = "application/pdf"
+    version = create_document_version(document)
+    version.content_type = "application/pdf"
 
     with pytest.raises(ValueError, match="Unsupported content type"):
-        await BasicDocumentProcessor(storage).process(document)
+        await BasicDocumentProcessor(storage).process(document, version)
 
 
 @pytest.mark.asyncio
@@ -102,9 +94,10 @@ async def test_basic_document_processor_rejects_empty_content() -> None:
         content=BytesIO(b"   "),
     )
     document = create_document(storage_key=stored_file.storage_key)
+    version = create_document_version(document, storage_key=stored_file.storage_key)
 
     with pytest.raises(ValueError, match="content is empty"):
-        await BasicDocumentProcessor(storage).process(document)
+        await BasicDocumentProcessor(storage).process(document, version)
 
 
 def test_basic_document_processor_requires_positive_chunk_size() -> None:

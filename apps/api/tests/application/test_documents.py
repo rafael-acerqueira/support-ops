@@ -92,18 +92,18 @@ class SuccessfulDocumentProcessor:
     async def process(
         self,
         document: Document,
-        document_version: DocumentVersion | None = None,
+        document_version: DocumentVersion,
     ) -> list[DocumentChunk]:
         return [
             DocumentChunk(
                 document_id=document.id,
-                document_version_id=document_version.id if document_version else None,
+                document_version_id=document_version.id,
                 chunk_index=0,
                 content="Refund requests must include a reason.",
             ),
             DocumentChunk(
                 document_id=document.id,
-                document_version_id=document_version.id if document_version else None,
+                document_version_id=document_version.id,
                 chunk_index=1,
                 content="Enterprise refunds require approval.",
             ),
@@ -114,7 +114,7 @@ class FailingDocumentProcessor:
     async def process(
         self,
         document: Document,
-        document_version: DocumentVersion | None = None,
+        document_version: DocumentVersion,
     ) -> list[DocumentChunk]:
         raise RuntimeError("Parser failed")
 
@@ -152,6 +152,25 @@ def create_indexed_version(document_id: UUID, version: str = "v2") -> DocumentVe
     document_version.start_processing()
     document_version.mark_indexed(chunk_count=3)
     return document_version
+
+
+async def add_current_version(
+    document_repository: InMemoryDocumentRepository,
+    version_repository: InMemoryDocumentVersionRepository,
+    document: Document,
+) -> DocumentVersion:
+    version = DocumentVersion.create(
+        document_id=document.id,
+        version=document.version,
+        source_file_name=document.source_file_name,
+        content_type=document.content_type,
+        size_bytes=document.size_bytes,
+        storage_key=f"documents/{document.id}/{document.version}.md",
+    )
+    document.current_version_id = version.id
+    await document_repository.add(document)
+    await version_repository.add(version)
+    return version
 
 
 @pytest.mark.asyncio
@@ -454,16 +473,20 @@ async def test_activate_and_deactivate_document() -> None:
 @pytest.mark.asyncio
 async def test_process_document_replaces_chunks_and_marks_document_indexed() -> None:
     repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
     document = create_uploaded_document()
-    await repository.add(document)
+    version = await add_current_version(repository, version_repository, document)
 
-    processed = await ProcessDocument(repository, SuccessfulDocumentProcessor()).execute(
-        document.id
-    )
+    processed = await ProcessDocument(
+        repository,
+        SuccessfulDocumentProcessor(),
+        version_repository=version_repository,
+    ).execute(document.id)
 
     assert processed.status == DocumentStatus.INDEXED
     assert processed.chunk_count == 2
     assert len(repository.chunks[document.id]) == 2
+    assert repository.chunks[document.id][0].document_version_id == version.id
 
 
 @pytest.mark.asyncio
@@ -674,13 +697,15 @@ async def test_process_document_marks_current_version_processing_before_work() -
 @pytest.mark.asyncio
 async def test_process_document_generates_chunk_embeddings_when_generator_is_provided() -> None:
     repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
     document = create_uploaded_document()
-    await repository.add(document)
+    await add_current_version(repository, version_repository, document)
 
     await ProcessDocument(
         repository,
         SuccessfulDocumentProcessor(),
         FakeEmbeddingGenerator(),
+        version_repository,
     ).execute(document.id)
 
     chunks = repository.chunks[document.id]
@@ -695,14 +720,16 @@ async def test_process_document_generates_chunk_embeddings_when_generator_is_pro
 @pytest.mark.asyncio
 async def test_process_document_marks_failed_when_embedding_generation_fails() -> None:
     repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
     document = create_uploaded_document()
-    await repository.add(document)
+    await add_current_version(repository, version_repository, document)
 
     with pytest.raises(RuntimeError, match="Embedding provider failed"):
         await ProcessDocument(
             repository,
             SuccessfulDocumentProcessor(),
             FailingEmbeddingGenerator(),
+            version_repository,
         ).execute(document.id)
 
     assert document.status == DocumentStatus.FAILED
@@ -713,11 +740,16 @@ async def test_process_document_marks_failed_when_embedding_generation_fails() -
 @pytest.mark.asyncio
 async def test_process_document_marks_failed_when_processor_fails() -> None:
     repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
     document = create_uploaded_document()
-    await repository.add(document)
+    await add_current_version(repository, version_repository, document)
 
     with pytest.raises(RuntimeError, match="Parser failed"):
-        await ProcessDocument(repository, FailingDocumentProcessor()).execute(document.id)
+        await ProcessDocument(
+            repository,
+            FailingDocumentProcessor(),
+            version_repository=version_repository,
+        ).execute(document.id)
 
     assert document.status == DocumentStatus.FAILED
     assert document.failure_reason == "Parser failed"

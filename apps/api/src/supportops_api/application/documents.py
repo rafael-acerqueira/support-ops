@@ -78,7 +78,7 @@ class DocumentProcessor(Protocol):
     async def process(
         self,
         document: Document,
-        document_version: DocumentVersion | None = None,
+        document_version: DocumentVersion,
     ) -> list[DocumentChunk]:
         pass
 
@@ -360,7 +360,7 @@ class ProcessDocument:
         document.start_processing()
         await self._repository.save(document)
         current_version = await self._sync_processing_version(document)
-        if document.storage_key is not None and current_version is None:
+        if current_version is None:
             reason = "Current document version is required for processing"
             document.mark_failed(reason)
             await self._repository.save(document)

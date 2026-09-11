@@ -61,12 +61,12 @@ class FakeDocumentProcessor:
     async def process(
         self,
         document: Document,
-        document_version: DocumentVersion | None = None,
+        document_version: DocumentVersion,
     ) -> list[DocumentChunk]:
         return [
             DocumentChunk(
                 document_id=document.id,
-                document_version_id=document_version.id if document_version else None,
+                document_version_id=document_version.id,
                 chunk_index=0,
                 content="Processed chunk",
             )
