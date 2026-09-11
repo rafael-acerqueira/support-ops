@@ -425,8 +425,11 @@ async def test_list_document_chunks(
 ) -> None:
     client, repository, _version_repository, _storage, _processing_queue, _session = api_client
     document = create_document(repository)
+    current_version_id = uuid4()
+    document.current_version_id = current_version_id
     chunk = DocumentChunk(
         document_id=document.id,
+        document_version_id=current_version_id,
         chunk_index=0,
         content="Refund requests must include a reason.",
         embedding=(0.1, -0.2),

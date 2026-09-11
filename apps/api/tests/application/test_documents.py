@@ -346,10 +346,19 @@ async def test_activate_document_version_rejects_version_from_another_document()
 
 
 @pytest.mark.asyncio
-async def test_list_document_chunks_returns_document_chunks() -> None:
+async def test_list_document_chunks_returns_current_version_chunks() -> None:
     repository = InMemoryDocumentRepository()
     document = create_uploaded_document()
-    chunks = [DocumentChunk(document_id=document.id, chunk_index=0, content="Refund policy")]
+    current_version_id = uuid4()
+    document.current_version_id = current_version_id
+    chunks = [
+        DocumentChunk(
+            document_id=document.id,
+            document_version_id=current_version_id,
+            chunk_index=0,
+            content="Refund policy",
+        )
+    ]
     await repository.add(document)
     await repository.replace_chunks(document.id, chunks)
 
@@ -385,6 +394,16 @@ async def test_list_document_chunks_prefers_current_version_chunks() -> None:
     listed_chunks = await ListDocumentChunks(repository).execute(document.id)
 
     assert listed_chunks == [chunks[1]]
+
+
+@pytest.mark.asyncio
+async def test_list_document_chunks_requires_current_version() -> None:
+    repository = InMemoryDocumentRepository()
+    document = create_uploaded_document()
+    await repository.add(document)
+
+    with pytest.raises(DocumentCurrentVersionNotFoundError):
+        await ListDocumentChunks(repository).execute(document.id)
 
 
 @pytest.mark.asyncio
