@@ -33,6 +33,19 @@ def test_document_starts_uploaded_and_normalizes_tags() -> None:
     assert document.storage_key == "documents/refund-policy.md"
 
 
+def test_document_can_exist_without_file_snapshot_metadata() -> None:
+    document = Document.create(
+        name="Refund Policy",
+        document_type=DocumentType.INTERNAL_POLICY,
+        product_area=ProductArea.BILLING,
+    )
+
+    assert document.source_file_name is None
+    assert document.content_type is None
+    assert document.size_bytes is None
+    assert document.storage_key is None
+
+
 def test_document_moves_through_processing_and_indexed_states() -> None:
     document = Document.create(
         name="Enterprise SLA",
