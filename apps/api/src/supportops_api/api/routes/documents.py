@@ -137,11 +137,7 @@ async def upload_document(
             name=stored_file.file_name,
             document_type=document_type,
             product_area=product_area,
-            source_file_name=stored_file.file_name,
-            content_type=stored_file.content_type,
-            size_bytes=stored_file.size_bytes,
             tags=tuple(tags),
-            storage_key=stored_file.storage_key,
         )
     )
     version = await CreateDocumentVersion(repository, version_repository).execute(

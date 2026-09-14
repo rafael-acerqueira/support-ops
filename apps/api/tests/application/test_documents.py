@@ -174,7 +174,7 @@ async def add_current_version(
 
 
 @pytest.mark.asyncio
-async def test_create_document_persists_uploaded_document() -> None:
+async def test_create_document_persists_logical_document() -> None:
     repository = InMemoryDocumentRepository()
     use_case = CreateDocument(repository)
 
@@ -183,18 +183,15 @@ async def test_create_document_persists_uploaded_document() -> None:
             name="Refund Policy",
             document_type=DocumentType.INTERNAL_POLICY,
             product_area=ProductArea.BILLING,
-            source_file_name="refund-policy.md",
-            content_type="text/markdown",
-            size_bytes=1024,
             tags=("refund", "enterprise"),
-            storage_key="documents/refund-policy.md",
         )
     )
 
     assert repository.documents[document.id] == document
     assert document.status == DocumentStatus.UPLOADED
     assert document.tags == ("refund", "enterprise")
-    assert document.storage_key == "documents/refund-policy.md"
+    assert document.current_version_id is None
+    assert document.storage_key is None
 
 
 @pytest.mark.asyncio

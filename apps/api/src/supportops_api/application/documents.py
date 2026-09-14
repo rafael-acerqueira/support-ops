@@ -137,10 +137,10 @@ class CreateDocumentInput:
     name: str
     document_type: DocumentType
     product_area: ProductArea
-    source_file_name: str
-    content_type: str
-    size_bytes: int
     tags: tuple[str, ...] = ()
+    source_file_name: str | None = None
+    content_type: str | None = None
+    size_bytes: int | None = None
     storage_key: str | None = None
 
 
