@@ -55,30 +55,31 @@ class FakeDocumentProcessingQueue:
 
         document.start_processing()
         version = await self._processing_version(document)
-        if version is not None:
-            version.start_processing()
-            await self._version_repository.save(version)
+        if version is None:
+            raise ValueError("Current document version is required for processing")
+
+        version.start_processing()
+        await self._version_repository.save(version)
 
         chunks = [
             DocumentChunk(
                 document_id=document.id,
-                document_version_id=version.id if version else None,
+                document_version_id=version.id,
                 chunk_index=0,
                 content="First chunk",
             ),
             DocumentChunk(
                 document_id=document.id,
-                document_version_id=version.id if version else None,
+                document_version_id=version.id,
                 chunk_index=1,
                 content="Second chunk",
             ),
         ]
         document.mark_indexed(chunk_count=len(chunks))
-        if version is not None:
-            version.mark_indexed(chunk_count=len(chunks))
-            await self._version_repository.deactivate_all_for_document(document.id)
-            version.activate()
-            await self._version_repository.save(version)
+        version.mark_indexed(chunk_count=len(chunks))
+        await self._version_repository.deactivate_all_for_document(document.id)
+        version.activate()
+        await self._version_repository.save(version)
 
         await self._repository.replace_chunks(document.id, chunks)
         await self._repository.save(document)
@@ -771,8 +772,10 @@ async def test_process_document(
         FakeSession,
     ],
 ) -> None:
-    client, repository, _version_repository, _storage, _processing_queue, session = api_client
+    client, repository, version_repository, _storage, _processing_queue, session = api_client
     document = create_document(repository)
+    version = create_indexed_version(version_repository, document.id)
+    document.current_version_id = version.id
 
     response = await client.post(f"/api/documents/{document.id}/process")
 

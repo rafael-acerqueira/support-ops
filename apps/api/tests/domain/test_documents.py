@@ -209,7 +209,22 @@ def test_document_version_requires_storage_key() -> None:
 
 def test_document_chunk_requires_non_empty_content() -> None:
     with pytest.raises(ValueError, match="content is required"):
-        DocumentChunk(document_id=uuid4(), chunk_index=0, content="   ")
+        DocumentChunk(
+            document_id=uuid4(),
+            document_version_id=uuid4(),
+            chunk_index=0,
+            content="   ",
+        )
+
+
+def test_document_chunk_requires_document_version() -> None:
+    with pytest.raises(ValueError, match="version is required"):
+        DocumentChunk(
+            document_id=uuid4(),
+            document_version_id=None,  # type: ignore[arg-type]
+            chunk_index=0,
+            content="Refund policy",
+        )
 
 
 def test_document_chunk_trims_content() -> None:
@@ -228,6 +243,7 @@ def test_document_chunk_trims_content() -> None:
 def test_document_chunk_preserves_embedding_values() -> None:
     chunk = DocumentChunk(
         document_id=uuid4(),
+        document_version_id=uuid4(),
         chunk_index=1,
         content="SLA response window",
         embedding=(0.1, -0.2),
@@ -244,6 +260,7 @@ def test_document_chunk_rejects_empty_embedding() -> None:
     with pytest.raises(ValueError, match="embedding cannot be empty"):
         DocumentChunk(
             document_id=uuid4(),
+            document_version_id=uuid4(),
             chunk_index=1,
             content="SLA response window",
             embedding=(),
@@ -254,6 +271,7 @@ def test_document_chunk_rejects_empty_embedding_provider() -> None:
     with pytest.raises(ValueError, match="embedding provider"):
         DocumentChunk(
             document_id=uuid4(),
+            document_version_id=uuid4(),
             chunk_index=1,
             content="SLA response window",
             embedding_provider="   ",
@@ -264,6 +282,7 @@ def test_document_chunk_rejects_empty_embedding_model() -> None:
     with pytest.raises(ValueError, match="embedding model"):
         DocumentChunk(
             document_id=uuid4(),
+            document_version_id=uuid4(),
             chunk_index=1,
             content="SLA response window",
             embedding_model="   ",

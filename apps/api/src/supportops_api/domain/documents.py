@@ -250,9 +250,9 @@ class DocumentVersion:
 @dataclass(frozen=True)
 class DocumentChunk:
     document_id: UUID
+    document_version_id: UUID
     chunk_index: int
     content: str
-    document_version_id: UUID | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     embedding: tuple[float, ...] | None = None
     embedding_provider: str | None = None
@@ -270,6 +270,8 @@ class DocumentChunk:
 
         if self.chunk_index < 0:
             raise ValueError("Chunk index cannot be negative")
+        if self.document_version_id is None:
+            raise ValueError("Document chunk version is required")
         if not content:
             raise ValueError("Chunk content is required")
         if self.embedding is not None and embedding is None:

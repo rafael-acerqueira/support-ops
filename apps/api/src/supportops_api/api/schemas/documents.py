@@ -77,7 +77,7 @@ class DocumentResponse(BaseModel):
 class DocumentChunkResponse(BaseModel):
     id: UUID
     document_id: UUID
-    document_version_id: UUID | None
+    document_version_id: UUID
     chunk_index: int
     content: str
     metadata: dict

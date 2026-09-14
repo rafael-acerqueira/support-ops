@@ -170,19 +170,16 @@ def test_vector_type_converts_pgvector_text_to_python_values() -> None:
 async def test_replace_chunks_rejects_chunks_from_another_document() -> None:
     repository = PostgresDocumentRepository(session=None)  # type: ignore[arg-type]
     document_id = uuid4()
-    chunks = [DocumentChunk(document_id=uuid4(), chunk_index=0, content="Wrong document")]
+    chunks = [
+        DocumentChunk(
+            document_id=uuid4(),
+            document_version_id=uuid4(),
+            chunk_index=0,
+            content="Wrong document",
+        )
+    ]
 
     with pytest.raises(ValueError, match="belong to the document"):
-        await repository.replace_chunks(document_id, chunks)
-
-
-@pytest.mark.asyncio
-async def test_replace_chunks_rejects_chunks_without_document_version() -> None:
-    repository = PostgresDocumentRepository(session=None)  # type: ignore[arg-type]
-    document_id = uuid4()
-    chunks = [DocumentChunk(document_id=document_id, chunk_index=0, content="Legacy chunk")]
-
-    with pytest.raises(ValueError, match="belong to a document version"):
         await repository.replace_chunks(document_id, chunks)
 
 
