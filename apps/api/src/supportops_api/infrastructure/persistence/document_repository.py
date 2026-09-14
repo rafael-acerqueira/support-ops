@@ -66,8 +66,6 @@ class PostgresDocumentRepository(DocumentRepository):
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
         if any(chunk.document_id != document_id for chunk in chunks):
             raise ValueError("All chunks must belong to the document being replaced")
-        if any(chunk.document_version_id is None for chunk in chunks):
-            raise ValueError("All persisted chunks must belong to a document version")
 
         replacement_version_id = _chunk_replacement_version_id(chunks)
 
@@ -279,7 +277,7 @@ def _record_to_chunk(record: DocumentChunkRecord) -> DocumentChunk:
 
 
 def _chunk_replacement_version_id(chunks: list[DocumentChunk]) -> UUID | None:
-    version_ids = {chunk.document_version_id for chunk in chunks if chunk.document_version_id}
+    version_ids = {chunk.document_version_id for chunk in chunks}
     if len(version_ids) > 1:
         raise ValueError("All chunks must belong to the same document version")
 
