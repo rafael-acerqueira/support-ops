@@ -18,7 +18,6 @@ from supportops_api.infrastructure.persistence.document_repository import (
     PostgresDocumentRepository,
     _chunk_replacement_version_id,
     _chunk_to_record,
-    _current_chunk_version_filter,
     _document_to_record,
     _record_to_chunk,
     _record_to_document,
@@ -151,13 +150,6 @@ def test_chunk_replacement_version_id_returns_common_version() -> None:
     ]
 
     assert _chunk_replacement_version_id(chunks) == version_id
-
-
-def test_current_chunk_version_filter_requires_current_indexed_version() -> None:
-    compiled = str(_current_chunk_version_filter().compile())
-
-    assert "documents.current_version_id = document_chunks.document_version_id" in compiled
-    assert "document_versions.status" in compiled
 
 
 def test_vector_type_converts_python_values_to_pgvector_text() -> None:

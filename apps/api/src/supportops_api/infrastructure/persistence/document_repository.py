@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import and_, delete, select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from supportops_api.application.documents import DocumentRepository, DocumentVersionRepository
@@ -284,13 +284,6 @@ def _chunk_replacement_version_id(chunks: list[DocumentChunk]) -> UUID | None:
         raise ValueError("All chunks must belong to the same document version")
 
     return next(iter(version_ids), None)
-
-
-def _current_chunk_version_filter():
-    return and_(
-        DocumentRecord.current_version_id == DocumentChunkRecord.document_version_id,
-        DocumentVersionRecord.status == DocumentStatus.INDEXED.value,
-    )
 
 
 def _embedding_to_tuple(value: Sequence[float] | str | None) -> tuple[float, ...] | None:
