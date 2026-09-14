@@ -34,8 +34,8 @@ async def _process_document(document_id: UUID) -> dict[str, str]:
             document = await ProcessDocument(
                 repository,
                 processor,
-                embedding_generator,
                 PostgresDocumentVersionRepository(session),
+                embedding_generator,
             ).execute(document_id)
             await session.commit()
 

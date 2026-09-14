@@ -704,8 +704,8 @@ async def test_process_document_generates_chunk_embeddings_when_generator_is_pro
     await ProcessDocument(
         repository,
         SuccessfulDocumentProcessor(),
-        FakeEmbeddingGenerator(),
         version_repository,
+        FakeEmbeddingGenerator(),
     ).execute(document.id)
 
     chunks = repository.chunks[document.id]
@@ -728,8 +728,8 @@ async def test_process_document_marks_failed_when_embedding_generation_fails() -
         await ProcessDocument(
             repository,
             SuccessfulDocumentProcessor(),
-            FailingEmbeddingGenerator(),
             version_repository,
+            FailingEmbeddingGenerator(),
         ).execute(document.id)
 
     assert document.status == DocumentStatus.FAILED

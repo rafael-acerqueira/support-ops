@@ -141,8 +141,8 @@ async def test_inline_document_processing_queue_can_generate_embeddings() -> Non
     await InlineDocumentProcessingQueue(
         repository,
         FakeDocumentProcessor(),
-        FakeEmbeddingGenerator(),
         version_repository=version_repository,
+        embedding_generator=FakeEmbeddingGenerator(),
     ).enqueue(document.id)
 
     assert repository.chunks[document.id][0].embedding == (0.4, 0.8)

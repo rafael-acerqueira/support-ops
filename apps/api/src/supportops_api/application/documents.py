@@ -344,13 +344,13 @@ class ProcessDocument:
         self,
         repository: DocumentRepository,
         processor: DocumentProcessor,
+        version_repository: DocumentVersionRepository,
         embedding_generator: EmbeddingGenerator | None = None,
-        version_repository: DocumentVersionRepository | None = None,
     ) -> None:
         self._repository = repository
         self._processor = processor
-        self._embedding_generator = embedding_generator
         self._version_repository = version_repository
+        self._embedding_generator = embedding_generator
 
     async def execute(self, document_id: UUID) -> Document:
         document = await self._repository.get(document_id)
@@ -415,14 +415,10 @@ class ProcessDocument:
     async def _mark_processed(
         self,
         document: Document,
-        version: DocumentVersion | None,
+        version: DocumentVersion,
         *,
         chunk_count: int,
     ) -> None:
-        if version is None:
-            document.mark_indexed(chunk_count=chunk_count)
-            return
-
         version.mark_indexed(chunk_count=chunk_count)
         await self._version_repository.deactivate_all_for_document(document.id)
         version.activate()
@@ -432,21 +428,14 @@ class ProcessDocument:
     async def _mark_failed(
         self,
         document: Document,
-        version: DocumentVersion | None,
+        version: DocumentVersion,
         reason: str,
     ) -> None:
-        if version is None:
-            document.mark_failed(reason)
-            return
-
         version.mark_failed(reason)
         await self._version_repository.save(version)
         _sync_document_snapshot_from_version(document, version)
 
     async def _find_current_version(self, document: Document) -> DocumentVersion | None:
-        if self._version_repository is None:
-            return None
-
         if document.current_version_id is None:
             return None
 
