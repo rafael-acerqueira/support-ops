@@ -201,7 +201,7 @@ class CreateDocumentVersion:
             size_bytes=data.size_bytes,
             storage_key=data.storage_key,
         )
-        _sync_document_snapshot_from_version(document, version)
+        _sync_document_processing_state_from_version(document, version)
 
         await self._version_repository.add(version)
         await self._document_repository.save(document)
@@ -265,7 +265,7 @@ class ActivateDocumentVersion:
 
         await self._version_repository.deactivate_all_for_document(document.id)
         version.activate()
-        _sync_document_snapshot_from_version(document, version)
+        _sync_document_processing_state_from_version(document, version)
 
         await self._version_repository.save(version)
         await self._document_repository.save(document)
@@ -423,7 +423,7 @@ class ProcessDocument:
         await self._version_repository.deactivate_all_for_document(document.id)
         version.activate()
         await self._version_repository.save(version)
-        _sync_document_snapshot_from_version(document, version)
+        _sync_document_processing_state_from_version(document, version)
 
     async def _mark_failed(
         self,
@@ -433,7 +433,7 @@ class ProcessDocument:
     ) -> None:
         version.mark_failed(reason)
         await self._version_repository.save(version)
-        _sync_document_snapshot_from_version(document, version)
+        _sync_document_processing_state_from_version(document, version)
 
     async def _find_current_version(self, document: Document) -> DocumentVersion | None:
         if document.current_version_id is None:
@@ -446,7 +446,9 @@ class ProcessDocument:
         return None
 
 
-def _sync_document_snapshot_from_version(document: Document, version: DocumentVersion) -> None:
+def _sync_document_processing_state_from_version(
+    document: Document, version: DocumentVersion
+) -> None:
     document.current_version_id = version.id
     document.version = version.version
     document.status = version.status

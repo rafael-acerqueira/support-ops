@@ -371,10 +371,10 @@ async def test_get_document_prefers_current_version_id(
 ) -> None:
     client, repository, version_repository, _storage, _processing_queue, _session = api_client
     document = create_document(repository)
-    snapshot_match = create_indexed_version(version_repository, document.id, "v2")
+    stale_version = create_indexed_version(version_repository, document.id, "v2")
     current_version = create_indexed_version(version_repository, document.id, "v3")
-    document.version = snapshot_match.version
-    document.storage_key = snapshot_match.storage_key
+    document.version = stale_version.version
+    document.storage_key = stale_version.storage_key
     document.current_version_id = current_version.id
 
     response = await client.get(f"/api/documents/{document.id}")

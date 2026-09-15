@@ -303,7 +303,9 @@ async def test_get_document_raises_when_document_does_not_exist() -> None:
 
 
 @pytest.mark.asyncio
-async def test_activate_document_version_updates_active_version_and_document_snapshot() -> None:
+async def test_activate_document_version_updates_active_version_and_document_processing_state() -> (
+    None
+):
     document_repository = InMemoryDocumentRepository()
     version_repository = InMemoryDocumentVersionRepository()
     document = create_uploaded_document()
@@ -532,7 +534,7 @@ async def test_process_document_syncs_current_version_when_version_repository_is
 
 
 @pytest.mark.asyncio
-async def test_process_document_rejects_snapshot_match_without_current_version() -> None:
+async def test_process_document_rejects_stale_version_without_current_version() -> None:
     repository = InMemoryDocumentRepository()
     version_repository = InMemoryDocumentVersionRepository()
     document = Document.create(
@@ -587,7 +589,7 @@ async def test_process_document_prefers_current_version_id() -> None:
         storage_key="documents/refund-policy/v2.md",
     )
     document.version = "v2"
-    snapshot_match = DocumentVersion.create(
+    stale_version = DocumentVersion.create(
         document_id=document.id,
         version="v2",
         source_file_name=document.source_file_name,
@@ -605,7 +607,7 @@ async def test_process_document_prefers_current_version_id() -> None:
     )
     document.current_version_id = current_version.id
     await repository.add(document)
-    await version_repository.add(snapshot_match)
+    await version_repository.add(stale_version)
     await version_repository.add(current_version)
 
     await ProcessDocument(
@@ -615,7 +617,7 @@ async def test_process_document_prefers_current_version_id() -> None:
     ).execute(document.id)
 
     assert current_version.status == DocumentStatus.INDEXED
-    assert snapshot_match.status == DocumentStatus.UPLOADED
+    assert stale_version.status == DocumentStatus.UPLOADED
     assert document.current_version_id == current_version.id
     assert document.version == "v3"
     assert [chunk.document_version_id for chunk in repository.chunks[document.id]] == [
