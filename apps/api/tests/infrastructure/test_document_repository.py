@@ -80,7 +80,8 @@ def test_document_record_roundtrip_preserves_domain_values() -> None:
     assert mapped_document.product_area == ProductArea.BILLING
     assert mapped_document.status == DocumentStatus.INDEXED
     assert mapped_document.tags == ("refund", "enterprise")
-    assert mapped_document.storage_key == "documents/refund-policy.md"
+    assert record.storage_key is None
+    assert mapped_document.storage_key is None
     assert mapped_document.current_version_id == document.current_version_id
     assert mapped_document.chunk_count == 2
     assert mapped_document.last_processed_at == document.last_processed_at
