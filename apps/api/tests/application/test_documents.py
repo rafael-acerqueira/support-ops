@@ -162,9 +162,9 @@ async def add_current_version(
     version = DocumentVersion.create(
         document_id=document.id,
         version=document.version,
-        source_file_name=document.source_file_name,
-        content_type=document.content_type,
-        size_bytes=document.size_bytes,
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=1024,
         storage_key=f"documents/{document.id}/{document.version}.md",
     )
     document.current_version_id = version.id
@@ -504,10 +504,10 @@ async def test_process_document_syncs_current_version_when_version_repository_is
     version = DocumentVersion.create(
         document_id=document.id,
         version=document.version,
-        source_file_name=document.source_file_name,
-        content_type=document.content_type,
-        size_bytes=document.size_bytes,
-        storage_key=document.storage_key or "",
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=1024,
+        storage_key="documents/refund-policy/v1.md",
     )
     document.current_version_id = version.id
     await repository.add(document)
@@ -552,10 +552,10 @@ async def test_process_document_rejects_stale_version_without_current_version() 
     uploaded_version = DocumentVersion.create(
         document_id=document.id,
         version="v2",
-        source_file_name=document.source_file_name,
-        content_type=document.content_type,
-        size_bytes=document.size_bytes,
-        storage_key=document.storage_key or "",
+        source_file_name="refund-policy-v2.md",
+        content_type="text/markdown",
+        size_bytes=2048,
+        storage_key="documents/refund-policy/v2.md",
     )
     await repository.add(document)
     await version_repository.add(active_version)
@@ -592,10 +592,10 @@ async def test_process_document_prefers_current_version_id() -> None:
     stale_version = DocumentVersion.create(
         document_id=document.id,
         version="v2",
-        source_file_name=document.source_file_name,
-        content_type=document.content_type,
-        size_bytes=document.size_bytes,
-        storage_key=document.storage_key or "",
+        source_file_name="refund-policy-v2.md",
+        content_type="text/markdown",
+        size_bytes=2048,
+        storage_key="documents/refund-policy/v2.md",
     )
     current_version = DocumentVersion.create(
         document_id=document.id,
@@ -670,10 +670,10 @@ async def test_process_document_marks_current_version_processing_before_work() -
     version = DocumentVersion.create(
         document_id=document.id,
         version=document.version,
-        source_file_name=document.source_file_name,
-        content_type=document.content_type,
-        size_bytes=document.size_bytes,
-        storage_key=document.storage_key or "",
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=1024,
+        storage_key="documents/refund-policy/v1.md",
     )
     document.current_version_id = version.id
     await repository.add(document)

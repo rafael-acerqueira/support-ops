@@ -43,13 +43,16 @@ def create_document_version(
     document: Document,
     *,
     storage_key: str = "fake/refund-policy.md",
+    source_file_name: str = "refund-policy.md",
+    content_type: str = "text/markdown",
+    size_bytes: int = 1024,
 ) -> DocumentVersion:
     return DocumentVersion.create(
         document_id=document.id,
         version=document.version,
-        source_file_name=document.source_file_name,
-        content_type=document.content_type,
-        size_bytes=document.size_bytes,
+        source_file_name=source_file_name,
+        content_type=content_type,
+        size_bytes=size_bytes,
         storage_key=storage_key,
     )
 

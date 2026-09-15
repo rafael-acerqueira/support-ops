@@ -98,10 +98,10 @@ async def add_current_version(
     version = DocumentVersion.create(
         document_id=document.id,
         version=document.version,
-        source_file_name=document.source_file_name,
-        content_type=document.content_type,
-        size_bytes=document.size_bytes,
-        storage_key=document.storage_key or "",
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=1024,
+        storage_key="fake/refund-policy.md",
     )
     document.current_version_id = version.id
     await repository.save(document)
