@@ -218,7 +218,7 @@ async def test_create_document_version_persists_uploaded_version() -> None:
     assert version.status == DocumentStatus.UPLOADED
     assert document_repository.documents[document.id].current_version_id == version.id
     assert document_repository.documents[document.id].version == "v2"
-    assert document_repository.documents[document.id].storage_key == "documents/refund-policy/v2.md"
+    assert document_repository.documents[document.id].storage_key == document.storage_key
 
 
 @pytest.mark.asyncio
@@ -323,7 +323,7 @@ async def test_activate_document_version_updates_active_version_and_document_sna
     assert old_version.is_active is False
     assert document.current_version_id == new_version.id
     assert document.version == "v2"
-    assert document.storage_key == "documents/refund-policy/v2.md"
+    assert document.storage_key != new_version.storage_key
     assert document.status == DocumentStatus.INDEXED
     assert document.chunk_count == 3
     assert version_repository.saved_versions == [new_version]

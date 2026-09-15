@@ -449,10 +449,6 @@ class ProcessDocument:
 def _sync_document_snapshot_from_version(document: Document, version: DocumentVersion) -> None:
     document.current_version_id = version.id
     document.version = version.version
-    document.source_file_name = version.source_file_name
-    document.content_type = version.content_type
-    document.size_bytes = version.size_bytes
-    document.storage_key = version.storage_key
     document.status = version.status
     document.chunk_count = version.chunk_count
     document.failure_reason = version.failure_reason

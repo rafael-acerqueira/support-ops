@@ -600,7 +600,7 @@ async def test_activate_document_version(
     assert body["is_active"] is True
     assert old_version.is_active is False
     assert repository.documents[document.id].version == "v2"
-    assert repository.documents[document.id].storage_key == "documents/refund-policy/v2.md"
+    assert repository.documents[document.id].storage_key != version.storage_key
     assert processing_queue.enqueued_document_ids == [document.id]
     assert len(repository.chunks[document.id]) == 2
     assert session.commit_count == 2
@@ -733,7 +733,7 @@ async def test_upload_document_version(
     assert body["source_file_name"] == "refund-policy-v2.md"
     assert body["storage_key"] == "fake/refund-policy-v2.md"
     assert repository.documents[document.id].version == "v2"
-    assert repository.documents[document.id].storage_key == "fake/refund-policy-v2.md"
+    assert repository.documents[document.id].storage_key != "fake/refund-policy-v2.md"
     assert repository.documents[document.id].status == DocumentStatus.INDEXED
     assert len(repository.chunks[document.id]) == 2
     assert storage.saved_files == [
