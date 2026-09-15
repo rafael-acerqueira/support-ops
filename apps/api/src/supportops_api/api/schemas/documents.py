@@ -19,9 +19,6 @@ class CreateDocumentRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     document_type: DocumentType
     product_area: ProductArea
-    source_file_name: str = Field(min_length=1, max_length=512)
-    content_type: str = Field(min_length=1, max_length=128)
-    size_bytes: int = Field(gt=0)
     tags: list[str] = Field(default_factory=list)
 
 
@@ -35,10 +32,10 @@ class DocumentResponse(BaseModel):
     status: DocumentStatus
     is_active: bool
     tags: list[str]
-    source_file_name: str
+    source_file_name: str | None
     storage_key: str | None
-    content_type: str
-    size_bytes: int
+    content_type: str | None
+    size_bytes: int | None
     chunk_count: int
     failure_reason: str | None
     last_processed_at: datetime | None

@@ -272,9 +272,6 @@ async def test_create_document(
             "name": " Refund Policy ",
             "document_type": "internal_policy",
             "product_area": "billing",
-            "source_file_name": "refund-policy.md",
-            "content_type": "text/markdown",
-            "size_bytes": 1024,
             "tags": ["Enterprise", "refund", "REFUND"],
         },
     )
@@ -284,6 +281,10 @@ async def test_create_document(
     assert body["name"] == "Refund Policy"
     assert body["status"] == "uploaded"
     assert body["tags"] == ["enterprise", "refund"]
+    assert body["source_file_name"] is None
+    assert body["storage_key"] is None
+    assert body["content_type"] is None
+    assert body["size_bytes"] is None
     assert UUID(body["id"]) in repository.documents
     assert session.commit_count == 1
 

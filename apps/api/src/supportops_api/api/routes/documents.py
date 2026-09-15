@@ -95,9 +95,6 @@ async def create_document(
             name=payload.name,
             document_type=payload.document_type,
             product_area=payload.product_area,
-            source_file_name=payload.source_file_name,
-            content_type=payload.content_type,
-            size_bytes=payload.size_bytes,
             tags=tuple(payload.tags),
         )
     )

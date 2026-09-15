@@ -37,6 +37,22 @@ def test_document_response_uses_document_processing_fields_by_default() -> None:
     assert response.last_processed_at == document.last_processed_at
 
 
+def test_document_response_allows_logical_document_without_file_metadata() -> None:
+    document = Document.create(
+        name="Refund Policy",
+        document_type=DocumentType.INTERNAL_POLICY,
+        product_area=ProductArea.BILLING,
+    )
+
+    response = DocumentResponse.from_domain(document)
+
+    assert response.current_version_id is None
+    assert response.source_file_name is None
+    assert response.storage_key is None
+    assert response.content_type is None
+    assert response.size_bytes is None
+
+
 def test_document_response_can_use_document_version_processing_fields() -> None:
     document = create_document()
     version = DocumentVersion.create(

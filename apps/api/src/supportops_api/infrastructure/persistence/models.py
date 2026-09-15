@@ -117,15 +117,15 @@ class DocumentRecord(Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     tags: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
-    source_file_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    source_file_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
     storage_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     current_version_id: Mapped[UUID | None] = mapped_column(
         PostgresUUID(as_uuid=True),
         ForeignKey("document_versions.id", ondelete="SET NULL"),
         nullable=True,
     )
-    content_type: Mapped[str] = mapped_column(String(128), nullable=False)
-    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    content_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_processed_at: Mapped[datetime | None] = mapped_column(
