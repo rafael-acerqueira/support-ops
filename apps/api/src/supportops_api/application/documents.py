@@ -138,10 +138,6 @@ class CreateDocumentInput:
     document_type: DocumentType
     product_area: ProductArea
     tags: tuple[str, ...] = ()
-    source_file_name: str | None = None
-    content_type: str | None = None
-    size_bytes: int | None = None
-    storage_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -163,11 +159,7 @@ class CreateDocument:
             name=data.name,
             document_type=data.document_type,
             product_area=data.product_area,
-            source_file_name=data.source_file_name,
-            content_type=data.content_type,
-            size_bytes=data.size_bytes,
             tags=data.tags,
-            storage_key=data.storage_key,
         )
 
         await self._repository.add(document)
