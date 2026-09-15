@@ -17,11 +17,7 @@ def test_document_starts_uploaded_and_normalizes_tags() -> None:
         name=" Refund Policy ",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name=" refund-policy.md ",
-        content_type=" text/markdown ",
-        size_bytes=1024,
         tags=(" Enterprise ", "refund", "", "REFUND"),
-        storage_key=" documents/refund-policy.md ",
     )
 
     assert document.name == "Refund Policy"
@@ -30,20 +26,6 @@ def test_document_starts_uploaded_and_normalizes_tags() -> None:
     assert document.is_active is True
     assert document.current_version_id is None
     assert document.tags == ("enterprise", "refund")
-    assert document.storage_key == "documents/refund-policy.md"
-
-
-def test_document_can_exist_without_file_snapshot_metadata() -> None:
-    document = Document.create(
-        name="Refund Policy",
-        document_type=DocumentType.INTERNAL_POLICY,
-        product_area=ProductArea.BILLING,
-    )
-
-    assert document.source_file_name is None
-    assert document.content_type is None
-    assert document.size_bytes is None
-    assert document.storage_key is None
 
 
 def test_document_moves_through_processing_and_indexed_states() -> None:
@@ -51,9 +33,6 @@ def test_document_moves_through_processing_and_indexed_states() -> None:
         name="Enterprise SLA",
         document_type=DocumentType.SLA_POLICY,
         product_area=ProductArea.SUPPORT,
-        source_file_name="enterprise-sla.md",
-        content_type="text/markdown",
-        size_bytes=2048,
     )
 
     document.start_processing()
@@ -70,9 +49,6 @@ def test_document_requires_chunks_to_be_marked_indexed() -> None:
         name="Security Policy",
         document_type=DocumentType.SECURITY_POLICY,
         product_area=ProductArea.SECURITY,
-        source_file_name="security-policy.md",
-        content_type="text/markdown",
-        size_bytes=4096,
     )
 
     with pytest.raises(ValueError, match="at least one chunk"):
@@ -84,9 +60,6 @@ def test_document_can_be_deactivated_and_reactivated_without_changing_processing
         name="Incident Policy",
         document_type=DocumentType.INCIDENT_POLICY,
         product_area=ProductArea.SUPPORT,
-        source_file_name="incident-policy.md",
-        content_type="text/markdown",
-        size_bytes=512,
     )
     document.start_processing()
     document.mark_indexed(chunk_count=3)
@@ -105,9 +78,6 @@ def test_document_records_failure_reason() -> None:
         name="Billing Playbook",
         document_type=DocumentType.PLAYBOOK,
         product_area=ProductArea.BILLING,
-        source_file_name="billing-playbook.pdf",
-        content_type="application/pdf",
-        size_bytes=8192,
     )
 
     document.mark_failed("Unsupported file content")

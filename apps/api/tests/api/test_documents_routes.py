@@ -231,9 +231,6 @@ def create_document(repository: InMemoryDocumentRepository) -> Document:
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy.md",
-        content_type="text/markdown",
-        size_bytes=1024,
     )
     repository.documents[document.id] = document
     return document
@@ -374,7 +371,6 @@ async def test_get_document_prefers_current_version_id(
     stale_version = create_indexed_version(version_repository, document.id, "v2")
     current_version = create_indexed_version(version_repository, document.id, "v3")
     document.version = stale_version.version
-    document.storage_key = stale_version.storage_key
     document.current_version_id = current_version.id
 
     response = await client.get(f"/api/documents/{document.id}")
@@ -600,7 +596,7 @@ async def test_activate_document_version(
     assert body["is_active"] is True
     assert old_version.is_active is False
     assert repository.documents[document.id].version == "v2"
-    assert repository.documents[document.id].storage_key != version.storage_key
+    assert repository.documents[document.id].current_version_id == version.id
     assert processing_queue.enqueued_document_ids == [document.id]
     assert len(repository.chunks[document.id]) == 2
     assert session.commit_count == 2
@@ -733,7 +729,7 @@ async def test_upload_document_version(
     assert body["source_file_name"] == "refund-policy-v2.md"
     assert body["storage_key"] == "fake/refund-policy-v2.md"
     assert repository.documents[document.id].version == "v2"
-    assert repository.documents[document.id].storage_key != "fake/refund-policy-v2.md"
+    assert str(repository.documents[document.id].current_version_id) == body["id"]
     assert repository.documents[document.id].status == DocumentStatus.INDEXED
     assert len(repository.chunks[document.id]) == 2
     assert storage.saved_files == [

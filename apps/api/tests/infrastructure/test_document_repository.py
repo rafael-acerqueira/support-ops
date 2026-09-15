@@ -37,11 +37,7 @@ def create_indexed_document() -> Document:
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy.md",
-        content_type="text/markdown",
-        size_bytes=1024,
         tags=("refund", "enterprise"),
-        storage_key="documents/refund-policy.md",
     )
     document.start_processing()
     document.mark_indexed(chunk_count=2)
@@ -81,7 +77,6 @@ def test_document_record_roundtrip_preserves_domain_values() -> None:
     assert mapped_document.status == DocumentStatus.INDEXED
     assert mapped_document.tags == ("refund", "enterprise")
     assert record.storage_key is None
-    assert mapped_document.storage_key is None
     assert mapped_document.current_version_id == document.current_version_id
     assert mapped_document.chunk_count == 2
     assert mapped_document.last_processed_at == document.last_processed_at

@@ -27,15 +27,11 @@ class InMemoryDocumentStorage:
         return BytesIO(self.files[storage_key])
 
 
-def create_document(*, storage_key: str | None = "fake/refund-policy.md") -> Document:
+def create_document() -> Document:
     return Document.create(
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy.md",
-        content_type="text/markdown",
-        size_bytes=1024,
-        storage_key=storage_key,
     )
 
 
@@ -65,7 +61,7 @@ async def test_basic_document_processor_creates_chunks_from_text() -> None:
         content_type="text/markdown",
         content=BytesIO(b"First paragraph.\n\nSecond paragraph."),
     )
-    document = create_document(storage_key=stored_file.storage_key)
+    document = create_document()
     version = create_document_version(document, storage_key=stored_file.storage_key)
 
     chunks = await BasicDocumentProcessor(storage, max_chunk_chars=20).process(document, version)
@@ -96,7 +92,7 @@ async def test_basic_document_processor_rejects_empty_content() -> None:
         content_type="text/markdown",
         content=BytesIO(b"   "),
     )
-    document = create_document(storage_key=stored_file.storage_key)
+    document = create_document()
     version = create_document_version(document, storage_key=stored_file.storage_key)
 
     with pytest.raises(ValueError, match="content is empty"):

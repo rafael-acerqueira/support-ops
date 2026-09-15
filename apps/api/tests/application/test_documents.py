@@ -134,9 +134,6 @@ def create_uploaded_document() -> Document:
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy.md",
-        content_type="text/markdown",
-        size_bytes=1024,
     )
 
 
@@ -191,7 +188,6 @@ async def test_create_document_persists_logical_document() -> None:
     assert document.status == DocumentStatus.UPLOADED
     assert document.tags == ("refund", "enterprise")
     assert document.current_version_id is None
-    assert document.storage_key is None
 
 
 @pytest.mark.asyncio
@@ -218,7 +214,6 @@ async def test_create_document_version_persists_uploaded_version() -> None:
     assert version.status == DocumentStatus.UPLOADED
     assert document_repository.documents[document.id].current_version_id == version.id
     assert document_repository.documents[document.id].version == "v2"
-    assert document_repository.documents[document.id].storage_key == document.storage_key
 
 
 @pytest.mark.asyncio
@@ -325,7 +320,6 @@ async def test_activate_document_version_updates_active_version_and_document_pro
     assert old_version.is_active is False
     assert document.current_version_id == new_version.id
     assert document.version == "v2"
-    assert document.storage_key != new_version.storage_key
     assert document.status == DocumentStatus.INDEXED
     assert document.chunk_count == 3
     assert version_repository.saved_versions == [new_version]
@@ -496,10 +490,6 @@ async def test_process_document_syncs_current_version_when_version_repository_is
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy.md",
-        content_type="text/markdown",
-        size_bytes=1024,
-        storage_key="documents/refund-policy/v1.md",
     )
     version = DocumentVersion.create(
         document_id=document.id,
@@ -541,10 +531,6 @@ async def test_process_document_rejects_stale_version_without_current_version() 
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy-v2.md",
-        content_type="text/markdown",
-        size_bytes=2048,
-        storage_key="documents/refund-policy/v2.md",
     )
     document.version = "v2"
     active_version = create_indexed_version(document.id, "v1")
@@ -583,10 +569,6 @@ async def test_process_document_prefers_current_version_id() -> None:
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy-v2.md",
-        content_type="text/markdown",
-        size_bytes=2048,
-        storage_key="documents/refund-policy/v2.md",
     )
     document.version = "v2"
     stale_version = DocumentVersion.create(
@@ -634,10 +616,6 @@ async def test_process_document_requires_current_version_for_stored_document() -
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy.md",
-        content_type="text/markdown",
-        size_bytes=1024,
-        storage_key="documents/refund-policy/v1.md",
     )
     await repository.add(document)
 
@@ -662,10 +640,6 @@ async def test_process_document_marks_current_version_processing_before_work() -
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy.md",
-        content_type="text/markdown",
-        size_bytes=1024,
-        storage_key="documents/refund-policy/v1.md",
     )
     version = DocumentVersion.create(
         document_id=document.id,
