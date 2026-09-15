@@ -106,22 +106,24 @@ Run:
 
 ```sql
 select name, status, chunk_count, failure_reason
-from documents
+from document_versions
 order by created_at desc;
 
 select
-  document_id,
-  chunk_index,
+  dc.document_id,
+  dc.document_version_id,
+  dc.chunk_index,
   embedding is not null as has_embedding,
   embedding_provider,
   embedding_model
-from document_chunks
-order by document_id, chunk_index;
+from document_chunks dc
+join document_versions dv on dv.id = dc.document_version_id
+order by dc.document_id, dv.version, dc.chunk_index;
 ```
 
 Expected result:
 
-- `documents.status` is `indexed`.
+- `document_versions.status` is `indexed`.
 - `failure_reason` is `null`.
 - `chunk_count` is greater than `0`.
 - `has_embedding` is `true`.
@@ -146,10 +148,12 @@ You can also verify it in Postgres:
 select
   d.name,
   d.version as current_version,
-  dv.version,
+  dv.version as version,
   dv.status,
   dv.is_active,
-  dv.chunk_count
+  dv.chunk_count,
+  dv.source_file_name,
+  dv.storage_key
 from documents d
 join document_versions dv on dv.document_id = d.id
 order by dv.created_at desc;
