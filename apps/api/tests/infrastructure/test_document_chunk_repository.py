@@ -24,10 +24,6 @@ def test_record_to_source_maps_similarity_result() -> None:
         status="indexed",
         is_active=True,
         tags=["refund"],
-        source_file_name="refund-policy.md",
-        storage_key="documents/refund-policy.md",
-        content_type="text/markdown",
-        size_bytes=1024,
         chunk_count=1,
     )
     chunk = DocumentChunkRecord(

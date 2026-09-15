@@ -13,14 +13,10 @@ def create_document() -> Document:
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy-v1.md",
-        content_type="text/markdown",
-        size_bytes=1024,
-        storage_key="documents/refund-policy/v1.md",
     )
 
 
-def test_document_response_uses_document_processing_fields_by_default() -> None:
+def test_document_response_omits_file_metadata_without_processing_version() -> None:
     document = create_document()
     document.start_processing()
     document.mark_indexed(chunk_count=2)
@@ -30,8 +26,10 @@ def test_document_response_uses_document_processing_fields_by_default() -> None:
     assert response.current_version_id is None
     assert response.version == "v1"
     assert response.status == DocumentStatus.INDEXED
-    assert response.source_file_name == "refund-policy-v1.md"
-    assert response.storage_key == "documents/refund-policy/v1.md"
+    assert response.source_file_name is None
+    assert response.storage_key is None
+    assert response.content_type is None
+    assert response.size_bytes is None
     assert response.chunk_count == 2
     assert response.failure_reason is None
     assert response.last_processed_at == document.last_processed_at

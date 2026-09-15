@@ -48,10 +48,6 @@ def create_document() -> Document:
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy.md",
-        content_type="text/markdown",
-        size_bytes=1024,
-        storage_key="fake/refund-policy.md",
     )
 
 

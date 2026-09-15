@@ -133,11 +133,7 @@ def _document_to_record(document: Document) -> DocumentRecord:
         status=document.status.value,
         is_active=document.is_active,
         tags=list(document.tags),
-        source_file_name=None,
-        storage_key=None,
         current_version_id=document.current_version_id,
-        content_type=None,
-        size_bytes=None,
         chunk_count=document.chunk_count,
         failure_reason=document.failure_reason,
         last_processed_at=document.last_processed_at,
@@ -154,11 +150,7 @@ def _update_document_record(record: DocumentRecord, document: Document) -> None:
     record.status = document.status.value
     record.is_active = document.is_active
     record.tags = list(document.tags)
-    record.source_file_name = None
-    record.storage_key = None
     record.current_version_id = document.current_version_id
-    record.content_type = None
-    record.size_bytes = None
     record.chunk_count = document.chunk_count
     record.failure_reason = document.failure_reason
     record.last_processed_at = document.last_processed_at
