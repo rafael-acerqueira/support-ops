@@ -327,7 +327,7 @@ docker build -t supportops-workers:latest apps/workers -f apps/workers/Dockerfil
 - ✅ Initial confidence scoring
 - ✅ Initial low-confidence/additional-review detection
 - ✅ Document versioning compatibility workflow
-- Chunk storage linked directly to document versions
+- ✅ Chunk storage linked directly to document versions
 - Reranking
 - Citation validation & guardrails
 - Metrics & evaluation
