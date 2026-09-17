@@ -472,6 +472,10 @@ export default function DocumentsPage() {
       setSelectedDocumentChunks([]);
       setVersionFile(null);
       setMessage('Document version uploaded. Processing queued.');
+      await Promise.all([
+        loadDocuments({ silent: true }),
+        loadDocumentVersions(selectedDocumentId),
+      ]);
     } catch (uploadError) {
       setError(
         uploadError instanceof Error
@@ -1094,7 +1098,10 @@ export default function DocumentsPage() {
                           key={version.id}
                         >
                           <div className="version-summary">
-                            <span>{version.version}</span>
+                            <div className="version-title">
+                              <span>{version.version}</span>
+                              {!version.is_active && <em>Inactive</em>}
+                            </div>
                             <small>{version.source_file_name}</small>
                           </div>
                           <div className="version-meta">
