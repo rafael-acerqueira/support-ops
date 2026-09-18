@@ -569,9 +569,7 @@ export default function DocumentsPage() {
 
       setSelectedDocumentVersions((currentVersions) =>
         currentVersions.map((version) =>
-          version.id === activatedVersion.id
-            ? processingVersion
-            : { ...version, is_active: false }
+          version.id === activatedVersion.id ? processingVersion : { ...version, is_active: false }
         )
       );
       setDocuments((currentDocuments) =>

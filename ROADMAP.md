@@ -127,7 +127,7 @@ are tracked in Phase 2+.
 - [x] Real embedding provider
 - [x] LLM response generation from retrieved sources
 - [x] Document versioning compatibility workflow
-- [ ] Document chunks linked directly to document versions
+- [x] Document chunks linked directly to document versions
 - [ ] Reranking (cross-encoder or LLM-based)
 - [ ] Hybrid retrieval (keyword + vector + rerank)
 - [x] Initial confidence scoring refinement (score, level, and reason)

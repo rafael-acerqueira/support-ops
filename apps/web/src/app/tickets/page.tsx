@@ -47,9 +47,7 @@ type SuggestedResponseSource = {
 
 function formatSourceName(source: SuggestedResponseSource) {
   const documentName = source.document_name ?? 'Source document';
-  return source.document_version
-    ? `${documentName} / ${source.document_version}`
-    : documentName;
+  return source.document_version ? `${documentName} / ${source.document_version}` : documentName;
 }
 
 type SuggestedResponse = {

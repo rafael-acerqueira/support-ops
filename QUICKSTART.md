@@ -83,6 +83,7 @@ captured, settled, or already reversed.
 
 Upload it in Knowledge Base:
 
+- Document name: `Billing Refund Policy`
 - Document type: `Internal policy` or `Playbook`
 - Product area: `Billing`
 - Tags: `enterprise, refund, invoice, billing`
@@ -140,6 +141,7 @@ Expected result:
 - A new version appears in the version list, such as `v2`.
 - The document status moves to `Processing`, then `Indexed`.
 - The newest indexed version is marked `Active`.
+- Previous versions are shown as inactive and can be activated again.
 - The document detail shows the new version label and updated chunk count.
 
 You can also verify it in Postgres:
@@ -192,7 +194,7 @@ Expected result:
 
 - A suggested response appears.
 - The Sources section shows retrieved document chunks.
-- Each source shows document name, chunk number, excerpt, and match score.
+- Each source shows document name, active version, chunk number, excerpt, and match score.
 - If no source is found, the UI shows a low-confidence/no-source warning instead of a technical
   error.
 
