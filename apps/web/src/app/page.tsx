@@ -32,6 +32,7 @@ type DocumentReadinessTone = 'success' | 'warning' | 'error';
 
 type KnowledgeDocument = {
   id: string;
+  current_version_id: string | null;
   name: string;
   document_type: DocumentType;
   product_area: ProductArea;
@@ -53,6 +54,7 @@ type KnowledgeDocument = {
 type DocumentChunk = {
   id: string;
   document_id: string;
+  document_version_id: string | null;
   chunk_index: number;
   content: string;
   metadata: Record<string, unknown>;
@@ -60,6 +62,24 @@ type DocumentChunk = {
   embedding_provider: string | null;
   embedding_model: string | null;
   created_at: string;
+};
+
+type DocumentVersion = {
+  id: string;
+  document_id: string;
+  version: string;
+  status: DocumentStatus;
+  is_active: boolean;
+  source_file_name: string;
+  storage_key: string;
+  content_type: string;
+  size_bytes: number;
+  chunk_count: number;
+  failure_reason: string | null;
+  activated_at: string | null;
+  last_processed_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 const documentTypes: Array<{ value: DocumentType; label: string }> = [
@@ -120,6 +140,10 @@ function humanize(value: string) {
     .join(' ');
 }
 
+function documentNameFromFile(fileName: string) {
+  return fileName.replace(/\.[^/.]+$/, '');
+}
+
 function getDocumentReadiness(document: KnowledgeDocument): {
   label: string;
   message: string;
@@ -166,18 +190,25 @@ function getDocumentReadiness(document: KnowledgeDocument): {
 
 export default function DocumentsPage() {
   const detailPanelRef = useRef<HTMLElement | null>(null);
+  const documentNameWasEditedRef = useRef(false);
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
+  const [documentName, setDocumentName] = useState('');
   const [documentType, setDocumentType] = useState<DocumentType>('internal_policy');
   const [productArea, setProductArea] = useState<ProductArea>('support');
   const [tags, setTags] = useState('enterprise, sla');
   const [file, setFile] = useState<File | null>(null);
+  const [versionFile, setVersionFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingVersion, setIsUploadingVersion] = useState(false);
   const [busyDocumentId, setBusyDocumentId] = useState<string | null>(null);
   const [watchedDocumentIds, setWatchedDocumentIds] = useState<string[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [selectedDocumentChunks, setSelectedDocumentChunks] = useState<DocumentChunk[]>([]);
+  const [selectedDocumentVersions, setSelectedDocumentVersions] = useState<DocumentVersion[]>([]);
   const [isLoadingChunks, setIsLoadingChunks] = useState(false);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [busyVersionId, setBusyVersionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -237,11 +268,34 @@ export default function DocumentsPage() {
     }
   }, []);
 
+  const loadDocumentVersions = useCallback(async (documentId: string) => {
+    setIsLoadingVersions(true);
+
+    try {
+      const response = await fetch(`/api/documents/${documentId}/versions`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to load document versions.');
+
+      const versions = (await response.json()) as DocumentVersion[];
+      setSelectedDocumentVersions(versions);
+    } catch (versionError) {
+      setSelectedDocumentVersions([]);
+      setError(
+        versionError instanceof Error
+          ? versionError.message
+          : 'Unexpected error while loading document versions.'
+      );
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  }, []);
+
   const selectDocument = useCallback(
     (documentId: string) => {
       setSelectedDocumentId(documentId);
       setSelectedDocumentChunks([]);
+      setSelectedDocumentVersions([]);
       void loadDocumentChunks(documentId);
+      void loadDocumentVersions(documentId);
 
       window.requestAnimationFrame(() => {
         detailPanelRef.current?.scrollIntoView({
@@ -250,7 +304,7 @@ export default function DocumentsPage() {
         });
       });
     },
-    [loadDocumentChunks]
+    [loadDocumentChunks, loadDocumentVersions]
   );
 
   const loadDocuments = useCallback(async (options?: { silent?: boolean }) => {
@@ -266,6 +320,7 @@ export default function DocumentsPage() {
         if (!current || nextDocuments.some((document) => document.id === current)) return current;
 
         setSelectedDocumentChunks([]);
+        setSelectedDocumentVersions([]);
         return null;
       });
       setWatchedDocumentIds((current) =>
@@ -290,13 +345,26 @@ export default function DocumentsPage() {
 
     const intervalId = window.setInterval(() => {
       void loadDocuments({ silent: true });
+      if (selectedDocumentId) {
+        void loadDocumentVersions(selectedDocumentId);
+        void loadDocumentChunks(selectedDocumentId);
+      }
     }, 1500);
 
     return () => window.clearInterval(intervalId);
-  }, [isPolling, loadDocuments]);
+  }, [isPolling, loadDocumentChunks, loadDocumentVersions, loadDocuments, selectedDocumentId]);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    setFile(event.target.files?.[0] ?? null);
+    const selectedFile = event.target.files?.[0] ?? null;
+    setFile(selectedFile);
+
+    if (selectedFile && !documentNameWasEditedRef.current) {
+      setDocumentName(documentNameFromFile(selectedFile.name));
+    }
+  }
+
+  function handleVersionFileChange(event: ChangeEvent<HTMLInputElement>) {
+    setVersionFile(event.target.files?.[0] ?? null);
   }
 
   async function handleUpload(event: FormEvent<HTMLFormElement>) {
@@ -307,7 +375,13 @@ export default function DocumentsPage() {
       return;
     }
 
+    if (!documentName.trim()) {
+      setError('Enter a document name.');
+      return;
+    }
+
     const formData = new FormData();
+    formData.append('name', documentName.trim());
     formData.append('document_type', documentType);
     formData.append('product_area', productArea);
     tags
@@ -340,10 +414,16 @@ export default function DocumentsPage() {
         ...currentDocuments.filter((document) => document.id !== uploadedDocument.id),
       ]);
       setSelectedDocumentId(uploadedDocument.id);
+      setSelectedDocumentChunks([]);
+      setSelectedDocumentVersions([]);
+      void loadDocumentChunks(uploadedDocument.id);
+      void loadDocumentVersions(uploadedDocument.id);
       if (!['indexed', 'failed'].includes(uploadedDocument.status))
         watchDocument(uploadedDocument.id);
 
       setFile(null);
+      setDocumentName('');
+      documentNameWasEditedRef.current = false;
       setMessage('Document uploaded. Processing queued.');
     } catch (uploadError) {
       setError(
@@ -351,6 +431,78 @@ export default function DocumentsPage() {
       );
     } finally {
       setIsUploading(false);
+    }
+  }
+
+  async function handleVersionUpload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedDocumentId) return;
+
+    if (!versionFile) {
+      setError('Select a file to upload as a new version.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', versionFile);
+
+    setIsUploadingVersion(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/documents/${selectedDocumentId}/versions/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('The API rejected the version upload.');
+
+      const uploadedVersion = (await response.json()) as DocumentVersion;
+      const visibleVersion =
+        uploadedVersion.status === 'uploaded'
+          ? { ...uploadedVersion, status: 'processing' as DocumentStatus }
+          : uploadedVersion;
+
+      setSelectedDocumentVersions((currentVersions) => [
+        visibleVersion,
+        ...currentVersions.filter((version) => version.id !== uploadedVersion.id),
+      ]);
+      setDocuments((currentDocuments) =>
+        currentDocuments.map((document) =>
+          document.id === selectedDocumentId
+            ? {
+                ...document,
+                version: uploadedVersion.version,
+                source_file_name: uploadedVersion.source_file_name,
+                storage_key: uploadedVersion.storage_key,
+                content_type: uploadedVersion.content_type,
+                size_bytes: uploadedVersion.size_bytes,
+                status: 'processing',
+                chunk_count: 0,
+                failure_reason: null,
+                last_processed_at: null,
+              }
+            : document
+        )
+      );
+      watchDocument(selectedDocumentId);
+      setSelectedDocumentChunks([]);
+      setVersionFile(null);
+      setMessage('Document version uploaded. Processing queued.');
+      await Promise.all([
+        loadDocuments({ silent: true }),
+        loadDocumentVersions(selectedDocumentId),
+      ]);
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : 'Unexpected error during version upload.'
+      );
+    } finally {
+      setIsUploadingVersion(false);
     }
   }
 
@@ -392,6 +544,63 @@ export default function DocumentsPage() {
       );
     } finally {
       setBusyDocumentId(null);
+    }
+  }
+
+  async function activateDocumentVersion(versionId: string) {
+    if (!selectedDocumentId) return;
+
+    setBusyVersionId(versionId);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(
+        `/api/documents/${selectedDocumentId}/versions/${versionId}/activate`,
+        { method: 'POST' }
+      );
+      if (!response.ok) throw new Error('The API could not activate this version.');
+
+      const activatedVersion = (await response.json()) as DocumentVersion;
+      const processingVersion = {
+        ...activatedVersion,
+        status: 'processing' as DocumentStatus,
+      };
+
+      setSelectedDocumentVersions((currentVersions) =>
+        currentVersions.map((version) =>
+          version.id === activatedVersion.id ? processingVersion : { ...version, is_active: false }
+        )
+      );
+      setDocuments((currentDocuments) =>
+        currentDocuments.map((document) =>
+          document.id === selectedDocumentId
+            ? {
+                ...document,
+                version: activatedVersion.version,
+                source_file_name: activatedVersion.source_file_name,
+                storage_key: activatedVersion.storage_key,
+                content_type: activatedVersion.content_type,
+                size_bytes: activatedVersion.size_bytes,
+                status: 'processing',
+                chunk_count: 0,
+                failure_reason: null,
+                last_processed_at: null,
+              }
+            : document
+        )
+      );
+      setSelectedDocumentChunks([]);
+      watchDocument(selectedDocumentId);
+      setMessage('Document version activated. Processing queued.');
+    } catch (activationError) {
+      setError(
+        activationError instanceof Error
+          ? activationError.message
+          : 'Unexpected error while activating document version.'
+      );
+    } finally {
+      setBusyVersionId(null);
     }
   }
 
@@ -458,6 +667,20 @@ export default function DocumentsPage() {
               </div>
             </div>
 
+            <label className="field document-name-field">
+              <span>Document name</span>
+              <input
+                value={documentName}
+                onChange={(event) => {
+                  documentNameWasEditedRef.current = true;
+                  setDocumentName(event.target.value);
+                }}
+                placeholder="Refund Policy"
+                maxLength={255}
+                required
+              />
+            </label>
+
             <label className="field">
               <span>Document type</span>
               <select
@@ -501,7 +724,11 @@ export default function DocumentsPage() {
               <input type="file" onChange={handleFileChange} />
             </label>
 
-            <button className="primary-button" type="submit" disabled={isUploading}>
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={isUploading || !file || !documentName.trim()}
+            >
               {isUploading ? (
                 <Loader2 className="spin" size={18} aria-hidden="true" />
               ) : (
@@ -687,6 +914,8 @@ export default function DocumentsPage() {
                     onClick={() => {
                       setSelectedDocumentId(null);
                       setSelectedDocumentChunks([]);
+                      setSelectedDocumentVersions([]);
+                      setVersionFile(null);
                     }}
                     title="Close detail"
                   >
@@ -853,17 +1082,106 @@ export default function DocumentsPage() {
                     <div>
                       <h3 id="versions-title">Versions</h3>
                       <p>
-                        Version history will be available when document versioning is implemented.
+                        {isLoadingVersions
+                          ? 'Loading version history.'
+                          : `${selectedDocumentVersions.length} versions registered for this document.`}
                       </p>
                     </div>
-                    <button className="secondary-button compact" type="button" disabled>
+                    <button
+                      className="secondary-button compact"
+                      type="button"
+                      onClick={() => void loadDocumentVersions(selectedDocument.id)}
+                      disabled={isLoadingVersions}
+                    >
                       <History size={16} aria-hidden="true" />
-                      View versions
+                      Refresh
                     </button>
                   </div>
-                  <div className="version-row">
-                    <span>{selectedDocument.version}</span>
-                    <strong>Current</strong>
+
+                  <form className="version-upload" onSubmit={handleVersionUpload}>
+                    <label className="file-field compact-file-field">
+                      <FileText size={16} aria-hidden="true" />
+                      <span>{versionFile ? versionFile.name : 'Select new version file'}</span>
+                      <input type="file" onChange={handleVersionFileChange} />
+                    </label>
+                    <button
+                      className="primary-button compact"
+                      type="submit"
+                      disabled={isUploadingVersion || !versionFile}
+                    >
+                      {isUploadingVersion ? (
+                        <Loader2 className="spin" size={16} aria-hidden="true" />
+                      ) : (
+                        <Upload size={16} aria-hidden="true" />
+                      )}
+                      Upload new version
+                    </button>
+                  </form>
+
+                  <div className="version-list">
+                    {selectedDocumentVersions.map((version) => {
+                      const VersionStatusIcon = statusIcons[version.status];
+                      const isCurrentVersion = selectedDocument.current_version_id === version.id;
+                      const canActivate = version.status === 'indexed' && !version.is_active;
+                      const isVersionBusy = busyVersionId === version.id;
+
+                      return (
+                        <div
+                          className={`version-row ${version.is_active ? 'active' : ''} ${
+                            isCurrentVersion ? 'current' : ''
+                          }`}
+                          key={version.id}
+                        >
+                          <div className="version-summary">
+                            <div className="version-title">
+                              <span>{version.version}</span>
+                              {!version.is_active && <em>Inactive</em>}
+                            </div>
+                            <small>{version.source_file_name}</small>
+                          </div>
+                          <div className="version-meta">
+                            <span className={`status-badge ${version.status}`}>
+                              <VersionStatusIcon
+                                className={version.status === 'processing' ? 'spin' : undefined}
+                                size={14}
+                                aria-hidden="true"
+                              />
+                              {statusLabels[version.status]}
+                            </span>
+                            <span>{version.chunk_count} chunks</span>
+                            <span>{formatDate(version.activated_at ?? version.updated_at)}</span>
+                          </div>
+                          <div className="version-actions">
+                            {isCurrentVersion ? (
+                              <strong>{version.is_active ? 'Current active' : 'Current'}</strong>
+                            ) : (
+                              <button
+                                className="secondary-button compact"
+                                type="button"
+                                onClick={() => void activateDocumentVersion(version.id)}
+                                disabled={!canActivate || isVersionBusy}
+                                title={
+                                  canActivate
+                                    ? 'Activate version'
+                                    : 'Only indexed versions can be activated'
+                                }
+                              >
+                                {isVersionBusy ? (
+                                  <Loader2 className="spin" size={16} aria-hidden="true" />
+                                ) : (
+                                  <CheckCircle size={16} aria-hidden="true" />
+                                )}
+                                Activate
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {!isLoadingVersions && selectedDocumentVersions.length === 0 && (
+                      <div className="version-empty">No versions registered yet.</div>
+                    )}
                   </div>
                 </section>
               </>

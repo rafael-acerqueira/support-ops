@@ -83,6 +83,7 @@ captured, settled, or already reversed.
 
 Upload it in Knowledge Base:
 
+- Document name: `Billing Refund Policy`
 - Document type: `Internal policy` or `Playbook`
 - Product area: `Billing`
 - Tags: `enterprise, refund, invoice, billing`
@@ -106,29 +107,61 @@ Run:
 
 ```sql
 select name, status, chunk_count, failure_reason
-from documents
+from document_versions
 order by created_at desc;
 
 select
-  document_id,
-  chunk_index,
+  dc.document_id,
+  dc.document_version_id,
+  dc.chunk_index,
   embedding is not null as has_embedding,
   embedding_provider,
   embedding_model
-from document_chunks
-order by document_id, chunk_index;
+from document_chunks dc
+join document_versions dv on dv.id = dc.document_version_id
+order by dc.document_id, dv.version, dc.chunk_index;
 ```
 
 Expected result:
 
-- `documents.status` is `indexed`.
+- `document_versions.status` is `indexed`.
 - `failure_reason` is `null`.
 - `chunk_count` is greater than `0`.
 - `has_embedding` is `true`.
 - `embedding_provider` matches the configured provider.
 - `embedding_model` matches the configured model.
 
-### 4. Create a Ticket
+### 4. Upload a New Document Version
+
+In Knowledge Base, select the document detail and upload a different file in `Versions` using
+`Upload new version`.
+
+Expected result:
+
+- A new version appears in the version list, such as `v2`.
+- The document status moves to `Processing`, then `Indexed`.
+- The newest indexed version is marked `Active`.
+- Previous versions are shown as inactive and can be activated again.
+- The document detail shows the new version label and updated chunk count.
+
+You can also verify it in Postgres:
+
+```sql
+select
+  d.name,
+  d.version as current_version,
+  dv.version as version,
+  dv.status,
+  dv.is_active,
+  dv.chunk_count,
+  dv.source_file_name,
+  dv.storage_key
+from documents d
+join document_versions dv on dv.document_id = d.id
+order by dv.created_at desc;
+```
+
+### 5. Create a Ticket
 
 Open http://localhost:3000/tickets.
 
@@ -153,7 +186,7 @@ Expected result:
 - Selecting it opens the detail panel.
 - The detail panel shows `Ready for response drafting`.
 
-### 5. Generate a Suggested Response
+### 6. Generate a Suggested Response
 
 Click `Suggest response`.
 
@@ -161,11 +194,11 @@ Expected result:
 
 - A suggested response appears.
 - The Sources section shows retrieved document chunks.
-- Each source shows document name, chunk number, excerpt, and match score.
+- Each source shows document name, active version, chunk number, excerpt, and match score.
 - If no source is found, the UI shows a low-confidence/no-source warning instead of a technical
   error.
 
-### 6. Review the Suggestion
+### 7. Review the Suggestion
 
 Click `Approve` or `Reject`.
 
@@ -176,7 +209,7 @@ Expected result:
 - The latest suggestion remains visible.
 - Older suggestions appear in `Suggestion history` after more than one response is generated.
 
-### 7. Verify Suggested Responses in the Database
+### 8. Verify Suggested Responses in the Database
 
 ```sql
 select id, ticket_id, status, sources

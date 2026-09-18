@@ -3,11 +3,13 @@ from supportops_api.infrastructure.persistence.document_chunk_repository import 
 )
 from supportops_api.infrastructure.persistence.document_repository import (
     PostgresDocumentRepository,
+    PostgresDocumentVersionRepository,
 )
 from supportops_api.infrastructure.persistence.models import (
     Base,
     DocumentChunkRecord,
     DocumentRecord,
+    DocumentVersionRecord,
     SuggestedResponseRecord,
     TicketRecord,
 )
@@ -22,8 +24,10 @@ __all__ = [
     "Base",
     "DocumentChunkRecord",
     "DocumentRecord",
+    "DocumentVersionRecord",
     "PostgresDocumentChunkRepository",
     "PostgresDocumentRepository",
+    "PostgresDocumentVersionRepository",
     "PostgresResponseSuggestionRepository",
     "PostgresTicketRepository",
     "SuggestedResponseRecord",

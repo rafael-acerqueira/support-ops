@@ -7,6 +7,7 @@ from supportops_api.domain.documents import (
     DocumentChunk,
     DocumentStatus,
     DocumentType,
+    DocumentVersion,
     ProductArea,
 )
 
@@ -16,19 +17,15 @@ def test_document_starts_uploaded_and_normalizes_tags() -> None:
         name=" Refund Policy ",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name=" refund-policy.md ",
-        content_type=" text/markdown ",
-        size_bytes=1024,
         tags=(" Enterprise ", "refund", "", "REFUND"),
-        storage_key=" documents/refund-policy.md ",
     )
 
     assert document.name == "Refund Policy"
     assert document.status == DocumentStatus.UPLOADED
     assert document.version == "v1"
     assert document.is_active is True
+    assert document.current_version_id is None
     assert document.tags == ("enterprise", "refund")
-    assert document.storage_key == "documents/refund-policy.md"
 
 
 def test_document_moves_through_processing_and_indexed_states() -> None:
@@ -36,9 +33,6 @@ def test_document_moves_through_processing_and_indexed_states() -> None:
         name="Enterprise SLA",
         document_type=DocumentType.SLA_POLICY,
         product_area=ProductArea.SUPPORT,
-        source_file_name="enterprise-sla.md",
-        content_type="text/markdown",
-        size_bytes=2048,
     )
 
     document.start_processing()
@@ -55,9 +49,6 @@ def test_document_requires_chunks_to_be_marked_indexed() -> None:
         name="Security Policy",
         document_type=DocumentType.SECURITY_POLICY,
         product_area=ProductArea.SECURITY,
-        source_file_name="security-policy.md",
-        content_type="text/markdown",
-        size_bytes=4096,
     )
 
     with pytest.raises(ValueError, match="at least one chunk"):
@@ -69,9 +60,6 @@ def test_document_can_be_deactivated_and_reactivated_without_changing_processing
         name="Incident Policy",
         document_type=DocumentType.INCIDENT_POLICY,
         product_area=ProductArea.SUPPORT,
-        source_file_name="incident-policy.md",
-        content_type="text/markdown",
-        size_bytes=512,
     )
     document.start_processing()
     document.mark_indexed(chunk_count=3)
@@ -90,9 +78,6 @@ def test_document_records_failure_reason() -> None:
         name="Billing Playbook",
         document_type=DocumentType.PLAYBOOK,
         product_area=ProductArea.BILLING,
-        source_file_name="billing-playbook.pdf",
-        content_type="application/pdf",
-        size_bytes=8192,
     )
 
     document.mark_failed("Unsupported file content")
@@ -101,20 +86,147 @@ def test_document_records_failure_reason() -> None:
     assert document.failure_reason == "Unsupported file content"
 
 
+def test_document_version_starts_uploaded_and_trims_file_metadata() -> None:
+    document_id = uuid4()
+
+    version = DocumentVersion.create(
+        document_id=document_id,
+        version=" v2 ",
+        source_file_name=" refund-policy.md ",
+        content_type=" text/markdown ",
+        size_bytes=1024,
+        storage_key=" documents/refund-policy/v2.md ",
+    )
+
+    assert version.document_id == document_id
+    assert version.version == "v2"
+    assert version.source_file_name == "refund-policy.md"
+    assert version.content_type == "text/markdown"
+    assert version.storage_key == "documents/refund-policy/v2.md"
+    assert version.status == DocumentStatus.UPLOADED
+    assert version.is_active is False
+    assert version.chunk_count == 0
+    assert version.activated_at is None
+
+
+def test_document_version_moves_through_processing_and_indexed_states() -> None:
+    version = DocumentVersion.create(
+        document_id=uuid4(),
+        version="v3",
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=2048,
+        storage_key="documents/refund-policy/v3.md",
+    )
+
+    version.start_processing()
+    version.mark_indexed(chunk_count=5)
+    version.activate()
+
+    assert version.status == DocumentStatus.INDEXED
+    assert version.chunk_count == 5
+    assert version.failure_reason is None
+    assert version.last_processed_at is not None
+    assert version.is_active is True
+    assert version.activated_at is not None
+
+    version.deactivate()
+    assert version.is_active is False
+
+
+def test_document_version_requires_chunks_to_be_marked_indexed() -> None:
+    version = DocumentVersion.create(
+        document_id=uuid4(),
+        version="v1",
+        source_file_name="sla.md",
+        content_type="text/markdown",
+        size_bytes=512,
+        storage_key="documents/sla/v1.md",
+    )
+
+    with pytest.raises(ValueError, match="at least one chunk"):
+        version.mark_indexed(chunk_count=0)
+
+
+def test_document_version_requires_indexed_status_to_activate() -> None:
+    version = DocumentVersion.create(
+        document_id=uuid4(),
+        version="v1",
+        source_file_name="sla.md",
+        content_type="text/markdown",
+        size_bytes=512,
+        storage_key="documents/sla/v1.md",
+    )
+
+    with pytest.raises(ValueError, match="Only indexed"):
+        version.activate()
+
+
+def test_document_version_records_failure_reason() -> None:
+    version = DocumentVersion.create(
+        document_id=uuid4(),
+        version="v1",
+        source_file_name="security.pdf",
+        content_type="application/pdf",
+        size_bytes=4096,
+        storage_key="documents/security/v1.pdf",
+    )
+
+    version.mark_failed("Could not extract text")
+
+    assert version.status == DocumentStatus.FAILED
+    assert version.failure_reason == "Could not extract text"
+
+
+def test_document_version_requires_storage_key() -> None:
+    with pytest.raises(ValueError, match="Storage key is required"):
+        DocumentVersion.create(
+            document_id=uuid4(),
+            version="v1",
+            source_file_name="security.pdf",
+            content_type="application/pdf",
+            size_bytes=4096,
+            storage_key="   ",
+        )
+
+
 def test_document_chunk_requires_non_empty_content() -> None:
     with pytest.raises(ValueError, match="content is required"):
-        DocumentChunk(document_id=uuid4(), chunk_index=0, content="   ")
+        DocumentChunk(
+            document_id=uuid4(),
+            document_version_id=uuid4(),
+            chunk_index=0,
+            content="   ",
+        )
+
+
+def test_document_chunk_requires_document_version() -> None:
+    with pytest.raises(ValueError, match="version is required"):
+        DocumentChunk(
+            document_id=uuid4(),
+            document_version_id=None,  # type: ignore[arg-type]
+            chunk_index=0,
+            content="Refund policy",
+        )
 
 
 def test_document_chunk_trims_content() -> None:
-    chunk = DocumentChunk(document_id=uuid4(), chunk_index=1, content="  SLA response window  ")
+    version_id = uuid4()
+    chunk = DocumentChunk(
+        document_id=uuid4(),
+        document_version_id=version_id,
+        chunk_index=1,
+        content="  SLA response window  ",
+    )
 
     assert chunk.content == "SLA response window"
+    assert chunk.document_version_id == version_id
 
 
 def test_document_chunk_preserves_embedding_values() -> None:
     chunk = DocumentChunk(
         document_id=uuid4(),
+        document_version_id=uuid4(),
         chunk_index=1,
         content="SLA response window",
         embedding=(0.1, -0.2),
@@ -131,6 +243,7 @@ def test_document_chunk_rejects_empty_embedding() -> None:
     with pytest.raises(ValueError, match="embedding cannot be empty"):
         DocumentChunk(
             document_id=uuid4(),
+            document_version_id=uuid4(),
             chunk_index=1,
             content="SLA response window",
             embedding=(),
@@ -141,6 +254,7 @@ def test_document_chunk_rejects_empty_embedding_provider() -> None:
     with pytest.raises(ValueError, match="embedding provider"):
         DocumentChunk(
             document_id=uuid4(),
+            document_version_id=uuid4(),
             chunk_index=1,
             content="SLA response window",
             embedding_provider="   ",
@@ -151,6 +265,7 @@ def test_document_chunk_rejects_empty_embedding_model() -> None:
     with pytest.raises(ValueError, match="embedding model"):
         DocumentChunk(
             document_id=uuid4(),
+            document_version_id=uuid4(),
             chunk_index=1,
             content="SLA response window",
             embedding_model="   ",

@@ -8,6 +8,7 @@ from supportops_api.domain.documents import (
     DocumentChunk,
     DocumentStatus,
     DocumentType,
+    DocumentVersion,
     ProductArea,
 )
 from supportops_api.infrastructure.queues import InlineDocumentProcessingQueue
@@ -34,9 +35,42 @@ class InMemoryDocumentRepository:
         self.chunks[document_id] = chunks
 
 
+class InMemoryDocumentVersionRepository:
+    def __init__(self) -> None:
+        self.versions: dict[UUID, DocumentVersion] = {}
+
+    async def add(self, version: DocumentVersion) -> None:
+        self.versions[version.id] = version
+
+    async def save(self, version: DocumentVersion) -> None:
+        self.versions[version.id] = version
+
+    async def get(self, version_id: UUID) -> DocumentVersion | None:
+        return self.versions.get(version_id)
+
+    async def list_for_document(self, document_id: UUID) -> list[DocumentVersion]:
+        return [version for version in self.versions.values() if version.document_id == document_id]
+
+    async def deactivate_all_for_document(self, document_id: UUID) -> None:
+        for version in self.versions.values():
+            if version.document_id == document_id:
+                version.deactivate()
+
+
 class FakeDocumentProcessor:
-    async def process(self, document: Document) -> list[DocumentChunk]:
-        return [DocumentChunk(document_id=document.id, chunk_index=0, content="Processed chunk")]
+    async def process(
+        self,
+        document: Document,
+        document_version: DocumentVersion,
+    ) -> list[DocumentChunk]:
+        return [
+            DocumentChunk(
+                document_id=document.id,
+                document_version_id=document_version.id,
+                chunk_index=0,
+                content="Processed chunk",
+            )
+        ]
 
 
 class FakeEmbeddingGenerator:
@@ -49,22 +83,41 @@ def create_document() -> Document:
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
+    )
+
+
+async def add_current_version(
+    repository: InMemoryDocumentRepository,
+    version_repository: InMemoryDocumentVersionRepository,
+    document: Document,
+) -> DocumentVersion:
+    version = DocumentVersion.create(
+        document_id=document.id,
+        version=document.version,
         source_file_name="refund-policy.md",
         content_type="text/markdown",
         size_bytes=1024,
         storage_key="fake/refund-policy.md",
     )
+    document.current_version_id = version.id
+    await repository.save(document)
+    await version_repository.add(version)
+    return version
 
 
 @pytest.mark.asyncio
 async def test_inline_document_processing_queue_processes_document_immediately() -> None:
     repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
     document = create_document()
     await repository.add(document)
+    await add_current_version(repository, version_repository, document)
 
-    enqueued = await InlineDocumentProcessingQueue(repository, FakeDocumentProcessor()).enqueue(
-        document.id
-    )
+    enqueued = await InlineDocumentProcessingQueue(
+        repository,
+        FakeDocumentProcessor(),
+        version_repository=version_repository,
+    ).enqueue(document.id)
 
     assert enqueued.document_id == document.id
     assert enqueued.task_id == f"inline:{document.id}"
@@ -76,13 +129,35 @@ async def test_inline_document_processing_queue_processes_document_immediately()
 @pytest.mark.asyncio
 async def test_inline_document_processing_queue_can_generate_embeddings() -> None:
     repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
     document = create_document()
     await repository.add(document)
+    await add_current_version(repository, version_repository, document)
 
     await InlineDocumentProcessingQueue(
         repository,
         FakeDocumentProcessor(),
-        FakeEmbeddingGenerator(),
+        version_repository=version_repository,
+        embedding_generator=FakeEmbeddingGenerator(),
     ).enqueue(document.id)
 
     assert repository.chunks[document.id][0].embedding == (0.4, 0.8)
+
+
+@pytest.mark.asyncio
+async def test_inline_document_processing_queue_syncs_current_version() -> None:
+    repository = InMemoryDocumentRepository()
+    version_repository = InMemoryDocumentVersionRepository()
+    document = create_document()
+    await repository.add(document)
+    version = await add_current_version(repository, version_repository, document)
+
+    await InlineDocumentProcessingQueue(
+        repository,
+        FakeDocumentProcessor(),
+        version_repository=version_repository,
+    ).enqueue(document.id)
+
+    assert version.status == DocumentStatus.INDEXED
+    assert version.is_active is True
+    assert version.chunk_count == 1

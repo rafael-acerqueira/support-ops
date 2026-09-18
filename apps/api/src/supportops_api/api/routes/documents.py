@@ -9,27 +9,36 @@ from supportops_api.api.dependencies import (
     get_document_processing_queue,
     get_document_repository,
     get_document_storage,
+    get_document_version_repository,
 )
 from supportops_api.api.schemas import (
     CreateDocumentRequest,
     DocumentChunkResponse,
     DocumentProcessingResponse,
     DocumentResponse,
+    DocumentVersionResponse,
 )
 from supportops_api.application.documents import (
     ActivateDocument,
+    ActivateDocumentVersion,
     CreateDocument,
     CreateDocumentInput,
+    CreateDocumentVersion,
+    CreateDocumentVersionInput,
     DeactivateDocument,
     DocumentNotFoundError,
     DocumentProcessingQueue,
     DocumentRepository,
     DocumentStorage,
+    DocumentVersionNotFoundError,
+    DocumentVersionRepository,
     GetDocument,
     ListDocumentChunks,
+    ListDocumentVersionChunks,
+    ListDocumentVersions,
     ListDocuments,
 )
-from supportops_api.domain.documents import DocumentType, ProductArea
+from supportops_api.domain.documents import Document, DocumentType, DocumentVersion, ProductArea
 from supportops_api.infrastructure.database import get_session
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -40,6 +49,38 @@ def _not_found_error(error: DocumentNotFoundError) -> HTTPException:
         status_code=status.HTTP_404_NOT_FOUND,
         detail={"message": "Document not found", "document_id": str(error.document_id)},
     )
+
+
+def _version_not_found_error(error: DocumentVersionNotFoundError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={
+            "message": "Document version not found",
+            "document_version_id": str(error.document_version_id),
+        },
+    )
+
+
+async def _document_response(
+    document: Document,
+    version_repository: DocumentVersionRepository,
+) -> DocumentResponse:
+    version = await _document_processing_version(document, version_repository)
+    return DocumentResponse.from_domain(document, processing_version=version)
+
+
+async def _document_processing_version(
+    document: Document,
+    version_repository: DocumentVersionRepository,
+) -> DocumentVersion | None:
+    if document.current_version_id is None:
+        return None
+
+    version = await version_repository.get(document.current_version_id)
+    if version is not None and version.document_id == document.id:
+        return version
+
+    return None
 
 
 @router.post("", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
@@ -54,9 +95,6 @@ async def create_document(
             name=payload.name,
             document_type=payload.document_type,
             product_area=payload.product_area,
-            source_file_name=payload.source_file_name,
-            content_type=payload.content_type,
-            size_bytes=payload.size_bytes,
             tags=tuple(payload.tags),
         )
     )
@@ -67,11 +105,13 @@ async def create_document(
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
+    name: str = Form(..., min_length=1, max_length=255),
     document_type: DocumentType = Form(...),
     product_area: ProductArea = Form(...),
     tags: list[str] = Form(default_factory=list),
     file: UploadFile = File(...),
     repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
     storage: DocumentStorage = Depends(get_document_storage),
     processing_queue: DocumentProcessingQueue = Depends(get_document_processing_queue),
     session: AsyncSession = Depends(get_session),
@@ -92,49 +132,57 @@ async def upload_document(
 
     document = await CreateDocument(repository).execute(
         CreateDocumentInput(
-            name=stored_file.file_name,
+            name=name,
             document_type=document_type,
             product_area=product_area,
+            tags=tuple(tags),
+        )
+    )
+    version = await CreateDocumentVersion(repository, version_repository).execute(
+        CreateDocumentVersionInput(
+            document_id=document.id,
+            version=document.version,
             source_file_name=stored_file.file_name,
             content_type=stored_file.content_type,
             size_bytes=stored_file.size_bytes,
-            tags=tuple(tags),
             storage_key=stored_file.storage_key,
         )
     )
 
+    await session.commit()
     try:
         await processing_queue.enqueue(document.id)
     except ValueError as error:
-        await session.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"message": str(error)},
         ) from error
 
     await session.commit()
-    return DocumentResponse.from_domain(document)
+    return DocumentResponse.from_domain(document, processing_version=version)
 
 
 @router.get("", response_model=list[DocumentResponse])
 async def list_documents(
     repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
 ) -> list[DocumentResponse]:
     documents = await ListDocuments(repository).execute()
-    return [DocumentResponse.from_domain(document) for document in documents]
+    return [await _document_response(document, version_repository) for document in documents]
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: UUID,
     repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
 ) -> DocumentResponse:
     try:
         document = await GetDocument(repository).execute(document_id)
     except DocumentNotFoundError as error:
         raise _not_found_error(error) from error
 
-    return DocumentResponse.from_domain(document)
+    return await _document_response(document, version_repository)
 
 
 @router.get("/{document_id}/chunks", response_model=list[DocumentChunkResponse])
@@ -150,10 +198,134 @@ async def list_document_chunks(
     return [DocumentChunkResponse.from_domain(chunk) for chunk in chunks]
 
 
+@router.get("/{document_id}/versions", response_model=list[DocumentVersionResponse])
+async def list_document_versions(
+    document_id: UUID,
+    repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
+) -> list[DocumentVersionResponse]:
+    try:
+        versions = await ListDocumentVersions(repository, version_repository).execute(document_id)
+    except DocumentNotFoundError as error:
+        raise _not_found_error(error) from error
+
+    return [DocumentVersionResponse.from_domain(version) for version in versions]
+
+
+@router.get(
+    "/{document_id}/versions/{version_id}/chunks",
+    response_model=list[DocumentChunkResponse],
+)
+async def list_document_version_chunks(
+    document_id: UUID,
+    version_id: UUID,
+    repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
+) -> list[DocumentChunkResponse]:
+    try:
+        chunks = await ListDocumentVersionChunks(repository, version_repository).execute(
+            document_id, version_id
+        )
+    except DocumentNotFoundError as error:
+        raise _not_found_error(error) from error
+    except DocumentVersionNotFoundError as error:
+        raise _version_not_found_error(error) from error
+
+    return [DocumentChunkResponse.from_domain(chunk) for chunk in chunks]
+
+
+@router.post(
+    "/{document_id}/versions/upload",
+    response_model=DocumentVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_document_version(
+    document_id: UUID,
+    file: UploadFile = File(...),
+    repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
+    storage: DocumentStorage = Depends(get_document_storage),
+    processing_queue: DocumentProcessingQueue = Depends(get_document_processing_queue),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentVersionResponse:
+    document = await repository.get(document_id)
+    if document is None:
+        raise _not_found_error(DocumentNotFoundError(document_id))
+
+    content_type = file.content_type or "application/octet-stream"
+
+    try:
+        stored_file = await storage.save(
+            file_name=file.filename or "document",
+            content_type=content_type,
+            content=file.file,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": str(error)},
+        ) from error
+
+    version = await CreateDocumentVersion(repository, version_repository).execute(
+        CreateDocumentVersionInput(
+            document_id=document.id,
+            source_file_name=stored_file.file_name,
+            content_type=stored_file.content_type,
+            size_bytes=stored_file.size_bytes,
+            storage_key=stored_file.storage_key,
+        )
+    )
+
+    await session.commit()
+    try:
+        await processing_queue.enqueue(document.id)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": str(error)},
+        ) from error
+
+    await session.commit()
+    return DocumentVersionResponse.from_domain(version)
+
+
+@router.post(
+    "/{document_id}/versions/{version_id}/activate",
+    response_model=DocumentVersionResponse,
+)
+async def activate_document_version(
+    document_id: UUID,
+    version_id: UUID,
+    repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
+    processing_queue: DocumentProcessingQueue = Depends(get_document_processing_queue),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentVersionResponse:
+    try:
+        version = await ActivateDocumentVersion(repository, version_repository).execute(
+            document_id, version_id
+        )
+        await session.commit()
+        await processing_queue.enqueue(document_id)
+    except DocumentNotFoundError as error:
+        raise _not_found_error(error) from error
+    except DocumentVersionNotFoundError as error:
+        raise _version_not_found_error(error) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": str(error)},
+        ) from error
+
+    await session.commit()
+    return DocumentVersionResponse.from_domain(version)
+
+
 @router.post("/{document_id}/activate", response_model=DocumentResponse)
 async def activate_document(
     document_id: UUID,
     repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentResponse:
     try:
@@ -162,13 +334,14 @@ async def activate_document(
         raise _not_found_error(error) from error
 
     await session.commit()
-    return DocumentResponse.from_domain(document)
+    return await _document_response(document, version_repository)
 
 
 @router.post("/{document_id}/deactivate", response_model=DocumentResponse)
 async def deactivate_document(
     document_id: UUID,
     repository: DocumentRepository = Depends(get_document_repository),
+    version_repository: DocumentVersionRepository = Depends(get_document_version_repository),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentResponse:
     try:
@@ -177,7 +350,7 @@ async def deactivate_document(
         raise _not_found_error(error) from error
 
     await session.commit()
-    return DocumentResponse.from_domain(document)
+    return await _document_response(document, version_repository)
 
 
 @router.post(

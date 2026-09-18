@@ -48,6 +48,8 @@ class BasicTicketKnowledgeRetriever(TicketKnowledgeRetriever):
                 document_id=candidate.document_id,
                 document_name=candidate.document_name,
                 document_type=candidate.document_type,
+                document_version_id=candidate.document_version_id,
+                document_version=candidate.document_version,
                 chunk_id=candidate.chunk_id,
                 chunk_index=candidate.chunk_index,
                 content=candidate.content,

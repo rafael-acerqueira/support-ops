@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 
 from supportops_api.application.documents import StoredDocumentFile
-from supportops_api.domain.documents import Document, DocumentType, ProductArea
+from supportops_api.domain.documents import Document, DocumentType, DocumentVersion, ProductArea
 from supportops_api.infrastructure.processing import BasicDocumentProcessor
 
 
@@ -27,14 +27,28 @@ class InMemoryDocumentStorage:
         return BytesIO(self.files[storage_key])
 
 
-def create_document(*, storage_key: str | None = "fake/refund-policy.md") -> Document:
+def create_document() -> Document:
     return Document.create(
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy.md",
-        content_type="text/markdown",
-        size_bytes=1024,
+    )
+
+
+def create_document_version(
+    document: Document,
+    *,
+    storage_key: str = "fake/refund-policy.md",
+    source_file_name: str = "refund-policy.md",
+    content_type: str = "text/markdown",
+    size_bytes: int = 1024,
+) -> DocumentVersion:
+    return DocumentVersion.create(
+        document_id=document.id,
+        version=document.version,
+        source_file_name=source_file_name,
+        content_type=content_type,
+        size_bytes=size_bytes,
         storage_key=storage_key,
     )
 
@@ -47,33 +61,27 @@ async def test_basic_document_processor_creates_chunks_from_text() -> None:
         content_type="text/markdown",
         content=BytesIO(b"First paragraph.\n\nSecond paragraph."),
     )
-    document = create_document(storage_key=stored_file.storage_key)
+    document = create_document()
+    version = create_document_version(document, storage_key=stored_file.storage_key)
 
-    chunks = await BasicDocumentProcessor(storage, max_chunk_chars=20).process(document)
+    chunks = await BasicDocumentProcessor(storage, max_chunk_chars=20).process(document, version)
 
     assert [chunk.content for chunk in chunks] == ["First paragraph.", "Second paragraph."]
     assert [chunk.chunk_index for chunk in chunks] == [0, 1]
     assert chunks[0].document_id == document.id
+    assert chunks[0].document_version_id == version.id
     assert chunks[0].metadata == {"source_file_name": "refund-policy.md"}
-
-
-@pytest.mark.asyncio
-async def test_basic_document_processor_requires_storage_key() -> None:
-    storage = InMemoryDocumentStorage()
-    document = create_document(storage_key=None)
-
-    with pytest.raises(ValueError, match="no storage key"):
-        await BasicDocumentProcessor(storage).process(document)
 
 
 @pytest.mark.asyncio
 async def test_basic_document_processor_rejects_unsupported_content_type() -> None:
     storage = InMemoryDocumentStorage()
     document = create_document()
-    document.content_type = "application/pdf"
+    version = create_document_version(document)
+    version.content_type = "application/pdf"
 
     with pytest.raises(ValueError, match="Unsupported content type"):
-        await BasicDocumentProcessor(storage).process(document)
+        await BasicDocumentProcessor(storage).process(document, version)
 
 
 @pytest.mark.asyncio
@@ -84,10 +92,11 @@ async def test_basic_document_processor_rejects_empty_content() -> None:
         content_type="text/markdown",
         content=BytesIO(b"   "),
     )
-    document = create_document(storage_key=stored_file.storage_key)
+    document = create_document()
+    version = create_document_version(document, storage_key=stored_file.storage_key)
 
     with pytest.raises(ValueError, match="content is empty"):
-        await BasicDocumentProcessor(storage).process(document)
+        await BasicDocumentProcessor(storage).process(document, version)
 
 
 def test_basic_document_processor_requires_positive_chunk_size() -> None:

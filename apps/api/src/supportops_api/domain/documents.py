@@ -57,11 +57,8 @@ class Document:
     name: str
     document_type: DocumentType
     product_area: ProductArea
-    source_file_name: str
-    content_type: str
-    size_bytes: int
     tags: tuple[str, ...] = field(default_factory=tuple)
-    storage_key: str | None = None
+    current_version_id: UUID | None = None
     id: UUID = field(default_factory=uuid4)
     version: str = "v1"
     status: DocumentStatus = DocumentStatus.UPLOADED
@@ -74,21 +71,10 @@ class Document:
 
     def __post_init__(self) -> None:
         self.name = self.name.strip()
-        self.source_file_name = self.source_file_name.strip()
-        self.content_type = self.content_type.strip()
         self.tags = _normalize_tags(self.tags)
-        self.storage_key = self.storage_key.strip() if self.storage_key else None
 
         if not self.name:
             raise ValueError("Document name is required")
-        if not self.source_file_name:
-            raise ValueError("Source file name is required")
-        if not self.content_type:
-            raise ValueError("Content type is required")
-        if self.storage_key == "":
-            raise ValueError("Storage key cannot be blank")
-        if self.size_bytes <= 0:
-            raise ValueError("Document size must be greater than zero")
         if self.chunk_count < 0:
             raise ValueError("Chunk count cannot be negative")
 
@@ -99,21 +85,13 @@ class Document:
         name: str,
         document_type: DocumentType,
         product_area: ProductArea,
-        source_file_name: str,
-        content_type: str,
-        size_bytes: int,
         tags: tuple[str, ...] = (),
-        storage_key: str | None = None,
     ) -> Document:
         return cls(
             name=name,
             document_type=document_type,
             product_area=product_area,
-            source_file_name=source_file_name,
-            content_type=content_type,
-            size_bytes=size_bytes,
             tags=tags,
-            storage_key=storage_key,
         )
 
     def start_processing(self) -> None:
@@ -150,9 +128,106 @@ class Document:
         self.updated_at = _utcnow()
 
 
+@dataclass
+class DocumentVersion:
+    document_id: UUID
+    version: str
+    source_file_name: str
+    content_type: str
+    size_bytes: int
+    storage_key: str
+    id: UUID = field(default_factory=uuid4)
+    status: DocumentStatus = DocumentStatus.UPLOADED
+    is_active: bool = False
+    chunk_count: int = 0
+    failure_reason: str | None = None
+    created_at: datetime = field(default_factory=_utcnow)
+    updated_at: datetime = field(default_factory=_utcnow)
+    activated_at: datetime | None = None
+    last_processed_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        self.version = self.version.strip()
+        self.source_file_name = self.source_file_name.strip()
+        self.content_type = self.content_type.strip()
+        self.storage_key = self.storage_key.strip()
+
+        if not self.version:
+            raise ValueError("Document version is required")
+        if not self.source_file_name:
+            raise ValueError("Source file name is required")
+        if not self.content_type:
+            raise ValueError("Content type is required")
+        if not self.storage_key:
+            raise ValueError("Storage key is required")
+        if self.size_bytes <= 0:
+            raise ValueError("Document version size must be greater than zero")
+        if self.chunk_count < 0:
+            raise ValueError("Chunk count cannot be negative")
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        document_id: UUID,
+        version: str,
+        source_file_name: str,
+        content_type: str,
+        size_bytes: int,
+        storage_key: str,
+    ) -> DocumentVersion:
+        return cls(
+            document_id=document_id,
+            version=version,
+            source_file_name=source_file_name,
+            content_type=content_type,
+            size_bytes=size_bytes,
+            storage_key=storage_key,
+        )
+
+    def start_processing(self) -> None:
+        self.status = DocumentStatus.PROCESSING
+        self.failure_reason = None
+        self.updated_at = _utcnow()
+
+    def mark_indexed(self, *, chunk_count: int) -> None:
+        if chunk_count <= 0:
+            raise ValueError("Indexed document versions must have at least one chunk")
+
+        now = _utcnow()
+        self.status = DocumentStatus.INDEXED
+        self.chunk_count = chunk_count
+        self.failure_reason = None
+        self.last_processed_at = now
+        self.updated_at = now
+
+    def mark_failed(self, reason: str) -> None:
+        reason = reason.strip()
+        if not reason:
+            raise ValueError("Failure reason is required")
+
+        self.status = DocumentStatus.FAILED
+        self.failure_reason = reason
+        self.updated_at = _utcnow()
+
+    def activate(self) -> None:
+        if self.status != DocumentStatus.INDEXED:
+            raise ValueError("Only indexed document versions can be activated")
+
+        now = _utcnow()
+        self.is_active = True
+        self.activated_at = now
+        self.updated_at = now
+
+    def deactivate(self) -> None:
+        self.is_active = False
+        self.updated_at = _utcnow()
+
+
 @dataclass(frozen=True)
 class DocumentChunk:
     document_id: UUID
+    document_version_id: UUID
     chunk_index: int
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -172,6 +247,8 @@ class DocumentChunk:
 
         if self.chunk_index < 0:
             raise ValueError("Chunk index cannot be negative")
+        if self.document_version_id is None:
+            raise ValueError("Document chunk version is required")
         if not content:
             raise ValueError("Chunk content is required")
         if self.embedding is not None and embedding is None:

@@ -8,6 +8,7 @@ from supportops_api.domain.documents import (
     Document,
     DocumentChunk,
     DocumentType,
+    DocumentVersion,
     ProductArea,
 )
 
@@ -15,6 +16,18 @@ from supportops_api.domain.documents import (
 class DocumentNotFoundError(Exception):
     def __init__(self, document_id: UUID) -> None:
         super().__init__(f"Document not found: {document_id}")
+        self.document_id = document_id
+
+
+class DocumentVersionNotFoundError(Exception):
+    def __init__(self, document_version_id: UUID) -> None:
+        super().__init__(f"Document version not found: {document_version_id}")
+        self.document_version_id = document_version_id
+
+
+class DocumentCurrentVersionNotFoundError(Exception):
+    def __init__(self, document_id: UUID) -> None:
+        super().__init__(f"Current document version not found: {document_id}")
         self.document_id = document_id
 
 
@@ -35,15 +48,38 @@ class DocumentRepository(Protocol):
     async def list_all(self) -> list[Document]:
         pass
 
-    async def list_chunks(self, document_id: UUID) -> list[DocumentChunk]:
+    async def list_chunks_for_version(
+        self, document_id: UUID, document_version_id: UUID
+    ) -> list[DocumentChunk]:
         pass
 
     async def replace_chunks(self, document_id: UUID, chunks: list[DocumentChunk]) -> None:
         pass
 
 
+class DocumentVersionRepository(Protocol):
+    async def add(self, version: DocumentVersion) -> None:
+        pass
+
+    async def save(self, version: DocumentVersion) -> None:
+        pass
+
+    async def get(self, version_id: UUID) -> DocumentVersion | None:
+        pass
+
+    async def list_for_document(self, document_id: UUID) -> list[DocumentVersion]:
+        pass
+
+    async def deactivate_all_for_document(self, document_id: UUID) -> None:
+        pass
+
+
 class DocumentProcessor(Protocol):
-    async def process(self, document: Document) -> list[DocumentChunk]:
+    async def process(
+        self,
+        document: Document,
+        document_version: DocumentVersion,
+    ) -> list[DocumentChunk]:
         pass
 
 
@@ -101,11 +137,17 @@ class CreateDocumentInput:
     name: str
     document_type: DocumentType
     product_area: ProductArea
+    tags: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class CreateDocumentVersionInput:
+    document_id: UUID
     source_file_name: str
     content_type: str
     size_bytes: int
-    tags: tuple[str, ...] = ()
-    storage_key: str | None = None
+    storage_key: str
+    version: str | None = None
 
 
 class CreateDocument:
@@ -117,15 +159,45 @@ class CreateDocument:
             name=data.name,
             document_type=data.document_type,
             product_area=data.product_area,
-            source_file_name=data.source_file_name,
-            content_type=data.content_type,
-            size_bytes=data.size_bytes,
             tags=data.tags,
-            storage_key=data.storage_key,
         )
 
         await self._repository.add(document)
         return document
+
+
+class CreateDocumentVersion:
+    def __init__(
+        self,
+        document_repository: DocumentRepository,
+        version_repository: DocumentVersionRepository,
+    ) -> None:
+        self._document_repository = document_repository
+        self._version_repository = version_repository
+
+    async def execute(self, data: CreateDocumentVersionInput) -> DocumentVersion:
+        document = await self._document_repository.get(data.document_id)
+        if document is None:
+            raise DocumentNotFoundError(data.document_id)
+
+        version_label = data.version
+        if version_label is None:
+            versions = await self._version_repository.list_for_document(document.id)
+            version_label = _next_version_label(versions)
+
+        version = DocumentVersion.create(
+            document_id=document.id,
+            version=version_label,
+            source_file_name=data.source_file_name,
+            content_type=data.content_type,
+            size_bytes=data.size_bytes,
+            storage_key=data.storage_key,
+        )
+        _sync_document_processing_state_from_version(document, version)
+
+        await self._version_repository.add(version)
+        await self._document_repository.save(document)
+        return version
 
 
 class ListDocuments:
@@ -134,6 +206,23 @@ class ListDocuments:
 
     async def execute(self) -> list[Document]:
         return await self._repository.list_all()
+
+
+class ListDocumentVersions:
+    def __init__(
+        self,
+        document_repository: DocumentRepository,
+        version_repository: DocumentVersionRepository,
+    ) -> None:
+        self._document_repository = document_repository
+        self._version_repository = version_repository
+
+    async def execute(self, document_id: UUID) -> list[DocumentVersion]:
+        document = await self._document_repository.get(document_id)
+        if document is None:
+            raise DocumentNotFoundError(document_id)
+
+        return await self._version_repository.list_for_document(document_id)
 
 
 class GetDocument:
@@ -148,6 +237,33 @@ class GetDocument:
         return document
 
 
+class ActivateDocumentVersion:
+    def __init__(
+        self,
+        document_repository: DocumentRepository,
+        version_repository: DocumentVersionRepository,
+    ) -> None:
+        self._document_repository = document_repository
+        self._version_repository = version_repository
+
+    async def execute(self, document_id: UUID, version_id: UUID) -> DocumentVersion:
+        document = await self._document_repository.get(document_id)
+        if document is None:
+            raise DocumentNotFoundError(document_id)
+
+        version = await self._version_repository.get(version_id)
+        if version is None or version.document_id != document.id:
+            raise DocumentVersionNotFoundError(version_id)
+
+        await self._version_repository.deactivate_all_for_document(document.id)
+        version.activate()
+        _sync_document_processing_state_from_version(document, version)
+
+        await self._version_repository.save(version)
+        await self._document_repository.save(document)
+        return version
+
+
 class ListDocumentChunks:
     def __init__(self, repository: DocumentRepository) -> None:
         self._repository = repository
@@ -157,7 +273,34 @@ class ListDocumentChunks:
         if document is None:
             raise DocumentNotFoundError(document_id)
 
-        return await self._repository.list_chunks(document_id)
+        if document.current_version_id is None:
+            raise DocumentCurrentVersionNotFoundError(document.id)
+
+        return await self._repository.list_chunks_for_version(
+            document.id,
+            document.current_version_id,
+        )
+
+
+class ListDocumentVersionChunks:
+    def __init__(
+        self,
+        document_repository: DocumentRepository,
+        version_repository: DocumentVersionRepository,
+    ) -> None:
+        self._document_repository = document_repository
+        self._version_repository = version_repository
+
+    async def execute(self, document_id: UUID, version_id: UUID) -> list[DocumentChunk]:
+        document = await self._document_repository.get(document_id)
+        if document is None:
+            raise DocumentNotFoundError(document_id)
+
+        version = await self._version_repository.get(version_id)
+        if version is None or version.document_id != document.id:
+            raise DocumentVersionNotFoundError(version_id)
+
+        return await self._document_repository.list_chunks_for_version(document_id, version_id)
 
 
 class ActivateDocument:
@@ -193,10 +336,12 @@ class ProcessDocument:
         self,
         repository: DocumentRepository,
         processor: DocumentProcessor,
+        version_repository: DocumentVersionRepository,
         embedding_generator: EmbeddingGenerator | None = None,
     ) -> None:
         self._repository = repository
         self._processor = processor
+        self._version_repository = version_repository
         self._embedding_generator = embedding_generator
 
     async def execute(self, document_id: UUID) -> Document:
@@ -206,19 +351,34 @@ class ProcessDocument:
 
         document.start_processing()
         await self._repository.save(document)
+        current_version = await self._sync_processing_version(document)
+        if current_version is None:
+            reason = "Current document version is required for processing"
+            document.mark_failed(reason)
+            await self._repository.save(document)
+            raise DocumentCurrentVersionNotFoundError(document.id)
 
         try:
-            chunks = await self._processor.process(document)
+            chunks = await self._processor.process(document, current_version)
             chunks = await self._generate_embeddings(chunks)
-            document.mark_indexed(chunk_count=len(chunks))
             await self._repository.replace_chunks(document.id, chunks)
+            await self._mark_processed(document, current_version, chunk_count=len(chunks))
         except Exception as exc:
-            document.mark_failed(str(exc))
+            await self._mark_failed(document, current_version, str(exc))
             raise
         finally:
             await self._repository.save(document)
 
         return document
+
+    async def _sync_processing_version(self, document: Document) -> DocumentVersion | None:
+        version = await self._find_current_version(document)
+        if version is None:
+            return None
+
+        version.start_processing()
+        await self._version_repository.save(version)
+        return version
 
     async def _generate_embeddings(self, chunks: list[DocumentChunk]) -> list[DocumentChunk]:
         if self._embedding_generator is None:
@@ -231,6 +391,7 @@ class ProcessDocument:
                 DocumentChunk(
                     id=chunk.id,
                     document_id=chunk.document_id,
+                    document_version_id=chunk.document_version_id,
                     chunk_index=chunk.chunk_index,
                     content=chunk.content,
                     metadata=chunk.metadata,
@@ -242,3 +403,63 @@ class ProcessDocument:
             )
 
         return embedded_chunks
+
+    async def _mark_processed(
+        self,
+        document: Document,
+        version: DocumentVersion,
+        *,
+        chunk_count: int,
+    ) -> None:
+        version.mark_indexed(chunk_count=chunk_count)
+        await self._version_repository.deactivate_all_for_document(document.id)
+        version.activate()
+        await self._version_repository.save(version)
+        _sync_document_processing_state_from_version(document, version)
+
+    async def _mark_failed(
+        self,
+        document: Document,
+        version: DocumentVersion,
+        reason: str,
+    ) -> None:
+        version.mark_failed(reason)
+        await self._version_repository.save(version)
+        _sync_document_processing_state_from_version(document, version)
+
+    async def _find_current_version(self, document: Document) -> DocumentVersion | None:
+        if document.current_version_id is None:
+            return None
+
+        version = await self._version_repository.get(document.current_version_id)
+        if version is not None and version.document_id == document.id:
+            return version
+
+        return None
+
+
+def _sync_document_processing_state_from_version(
+    document: Document, version: DocumentVersion
+) -> None:
+    document.current_version_id = version.id
+    document.version = version.version
+    document.status = version.status
+    document.chunk_count = version.chunk_count
+    document.failure_reason = version.failure_reason
+    document.last_processed_at = version.last_processed_at
+    document.updated_at = version.updated_at
+
+
+def _next_version_label(versions: list[DocumentVersion]) -> str:
+    latest_number = 0
+
+    for version in versions:
+        if not version.version.startswith("v"):
+            continue
+
+        try:
+            latest_number = max(latest_number, int(version.version[1:]))
+        except ValueError:
+            continue
+
+    return f"v{latest_number + 1}"

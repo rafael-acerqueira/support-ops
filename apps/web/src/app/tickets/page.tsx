@@ -35,6 +35,8 @@ type TicketReadinessTone = 'success' | 'warning' | 'neutral';
 
 type SuggestedResponseSource = {
   document_id?: string;
+  document_version_id?: string;
+  document_version?: string;
   chunk_id?: string;
   chunk_index?: number;
   document_name?: string;
@@ -42,6 +44,11 @@ type SuggestedResponseSource = {
   relevance_score?: number;
   excerpt?: string;
 };
+
+function formatSourceName(source: SuggestedResponseSource) {
+  const documentName = source.document_name ?? 'Source document';
+  return source.document_version ? `${documentName} / ${source.document_version}` : documentName;
+}
 
 type SuggestedResponse = {
   id: string;
@@ -1142,7 +1149,7 @@ export default function TicketsPage() {
                             <div className="source-title">
                               <FileText size={15} aria-hidden="true" />
                               <div>
-                                <strong>{source.document_name ?? 'Source document'}</strong>
+                                <strong>{formatSourceName(source)}</strong>
                                 <span>
                                   {source.document_type
                                     ? humanize(source.document_type)
@@ -1293,7 +1300,7 @@ export default function TicketsPage() {
                                   }`}
                                   key={source.chunk_id ?? `${source.document_name}-${index}`}
                                 >
-                                  <strong>{source.document_name ?? 'Source document'}</strong>
+                                  <strong>{formatSourceName(source)}</strong>
                                   <span>{formatRelevanceScore(source.relevance_score)}</span>
                                   <small>
                                     {source.excerpt ?? 'No excerpt available for this source yet.'}

@@ -5,7 +5,18 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -106,10 +117,11 @@ class DocumentRecord(Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     tags: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
-    source_file_name: Mapped[str] = mapped_column(String(512), nullable=False)
-    storage_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
-    content_type: Mapped[str] = mapped_column(String(128), nullable=False)
-    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    current_version_id: Mapped[UUID | None] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("document_versions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_processed_at: Mapped[datetime | None] = mapped_column(
@@ -125,14 +137,78 @@ class DocumentRecord(Base):
     chunks: Mapped[list[DocumentChunkRecord]] = relationship(
         back_populates="document", cascade="all, delete-orphan"
     )
+    versions: Mapped[list[DocumentVersionRecord]] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+        foreign_keys="DocumentVersionRecord.document_id",
+    )
+    current_version: Mapped[DocumentVersionRecord | None] = relationship(
+        foreign_keys=[current_version_id],
+        post_update=True,
+    )
 
 
-class DocumentChunkRecord(Base):
-    __tablename__ = "document_chunks"
+class DocumentVersionRecord(Base):
+    __tablename__ = "document_versions"
+    __table_args__ = (
+        Index(
+            "uq_document_versions_active_per_document",
+            "document_id",
+            unique=True,
+            postgresql_where=text("is_active = true"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True)
     document_id: Mapped[UUID] = mapped_column(
         PostgresUUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    version: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    source_file_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(1024), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_processed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    document: Mapped[DocumentRecord] = relationship(
+        back_populates="versions",
+        foreign_keys=[document_id],
+    )
+    chunks: Mapped[list[DocumentChunkRecord]] = relationship(back_populates="document_version")
+
+
+class DocumentChunkRecord(Base):
+    __tablename__ = "document_chunks"
+    __table_args__ = (
+        Index(
+            "uq_document_chunks_document_version_id_chunk_index",
+            "document_version_id",
+            "chunk_index",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True)
+    document_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    document_version_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("document_versions.id", ondelete="CASCADE"),
+        nullable=False,
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -147,3 +223,4 @@ class DocumentChunkRecord(Base):
     )
 
     document: Mapped[DocumentRecord] = relationship(back_populates="chunks")
+    document_version: Mapped[DocumentVersionRecord] = relationship(back_populates="chunks")

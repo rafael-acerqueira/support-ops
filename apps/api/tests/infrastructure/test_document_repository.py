@@ -10,19 +10,24 @@ from supportops_api.domain.documents import (
     DocumentChunk,
     DocumentStatus,
     DocumentType,
+    DocumentVersion,
     ProductArea,
 )
 from supportops_api.infrastructure.database import get_database_url
 from supportops_api.infrastructure.persistence.document_repository import (
     PostgresDocumentRepository,
+    _chunk_replacement_version_id,
     _chunk_to_record,
     _document_to_record,
     _record_to_chunk,
     _record_to_document,
+    _record_to_version,
+    _version_to_record,
 )
 from supportops_api.infrastructure.persistence.models import (
     DocumentChunkRecord,
     DocumentRecord,
+    DocumentVersionRecord,
     Vector,
 )
 
@@ -32,15 +37,26 @@ def create_indexed_document() -> Document:
         name="Refund Policy",
         document_type=DocumentType.INTERNAL_POLICY,
         product_area=ProductArea.BILLING,
-        source_file_name="refund-policy.md",
-        content_type="text/markdown",
-        size_bytes=1024,
         tags=("refund", "enterprise"),
-        storage_key="documents/refund-policy.md",
     )
     document.start_processing()
     document.mark_indexed(chunk_count=2)
     return document
+
+
+def create_indexed_document_version(document_id: UUID) -> DocumentVersion:
+    version = DocumentVersion.create(
+        document_id=document_id,
+        version="v2",
+        source_file_name="refund-policy.md",
+        content_type="text/markdown",
+        size_bytes=2048,
+        storage_key="documents/refund-policy/v2.md",
+    )
+    version.start_processing()
+    version.mark_indexed(chunk_count=3)
+    version.activate()
+    return version
 
 
 def create_test_embedding(value: float) -> tuple[float, ...]:
@@ -49,6 +65,7 @@ def create_test_embedding(value: float) -> tuple[float, ...]:
 
 def test_document_record_roundtrip_preserves_domain_values() -> None:
     document = create_indexed_document()
+    document.current_version_id = uuid4()
 
     record = _document_to_record(document)
     mapped_document = _record_to_document(record)
@@ -59,14 +76,34 @@ def test_document_record_roundtrip_preserves_domain_values() -> None:
     assert mapped_document.product_area == ProductArea.BILLING
     assert mapped_document.status == DocumentStatus.INDEXED
     assert mapped_document.tags == ("refund", "enterprise")
-    assert mapped_document.storage_key == "documents/refund-policy.md"
+    assert mapped_document.current_version_id == document.current_version_id
     assert mapped_document.chunk_count == 2
     assert mapped_document.last_processed_at == document.last_processed_at
 
 
+def test_document_version_record_roundtrip_preserves_domain_values() -> None:
+    document_id = uuid4()
+    version = create_indexed_document_version(document_id)
+
+    record = _version_to_record(version)
+    mapped_version = _record_to_version(record)
+
+    assert mapped_version.id == version.id
+    assert mapped_version.document_id == document_id
+    assert mapped_version.version == "v2"
+    assert mapped_version.status == DocumentStatus.INDEXED
+    assert mapped_version.is_active is True
+    assert mapped_version.storage_key == "documents/refund-policy/v2.md"
+    assert mapped_version.chunk_count == 3
+    assert mapped_version.activated_at == version.activated_at
+    assert mapped_version.last_processed_at == version.last_processed_at
+
+
 def test_chunk_record_roundtrip_preserves_domain_values() -> None:
+    version_id = uuid4()
     chunk = DocumentChunk(
         document_id=uuid4(),
+        document_version_id=version_id,
         chunk_index=1,
         content="Enterprise refunds require approval.",
         metadata={"section": "Refund policy"},
@@ -80,12 +117,34 @@ def test_chunk_record_roundtrip_preserves_domain_values() -> None:
 
     assert mapped_chunk.id == chunk.id
     assert mapped_chunk.document_id == chunk.document_id
+    assert mapped_chunk.document_version_id == version_id
     assert mapped_chunk.chunk_index == 1
     assert mapped_chunk.content == "Enterprise refunds require approval."
     assert mapped_chunk.metadata == {"section": "Refund policy"}
     assert mapped_chunk.embedding == (0.1, -0.2, 0.3)
     assert mapped_chunk.embedding_provider == "openai"
     assert mapped_chunk.embedding_model == "text-embedding-3-small"
+
+
+def test_chunk_replacement_version_id_returns_common_version() -> None:
+    document_id = uuid4()
+    version_id = uuid4()
+    chunks = [
+        DocumentChunk(
+            document_id=document_id,
+            document_version_id=version_id,
+            chunk_index=0,
+            content="First chunk",
+        ),
+        DocumentChunk(
+            document_id=document_id,
+            document_version_id=version_id,
+            chunk_index=1,
+            content="Second chunk",
+        ),
+    ]
+
+    assert _chunk_replacement_version_id(chunks) == version_id
 
 
 def test_vector_type_converts_python_values_to_pgvector_text() -> None:
@@ -106,9 +165,39 @@ def test_vector_type_converts_pgvector_text_to_python_values() -> None:
 async def test_replace_chunks_rejects_chunks_from_another_document() -> None:
     repository = PostgresDocumentRepository(session=None)  # type: ignore[arg-type]
     document_id = uuid4()
-    chunks = [DocumentChunk(document_id=uuid4(), chunk_index=0, content="Wrong document")]
+    chunks = [
+        DocumentChunk(
+            document_id=uuid4(),
+            document_version_id=uuid4(),
+            chunk_index=0,
+            content="Wrong document",
+        )
+    ]
 
     with pytest.raises(ValueError, match="belong to the document"):
+        await repository.replace_chunks(document_id, chunks)
+
+
+@pytest.mark.asyncio
+async def test_replace_chunks_rejects_chunks_from_multiple_document_versions() -> None:
+    repository = PostgresDocumentRepository(session=None)  # type: ignore[arg-type]
+    document_id = uuid4()
+    chunks = [
+        DocumentChunk(
+            document_id=document_id,
+            document_version_id=uuid4(),
+            chunk_index=0,
+            content="First version chunk",
+        ),
+        DocumentChunk(
+            document_id=document_id,
+            document_version_id=uuid4(),
+            chunk_index=1,
+            content="Second version chunk",
+        ),
+    ]
+
+    with pytest.raises(ValueError, match="same document version"):
         await repository.replace_chunks(document_id, chunks)
 
 
@@ -121,10 +210,13 @@ async def test_postgres_document_repository_persists_document_workflow() -> None
     engine = create_async_engine(get_database_url(), pool_pre_ping=True)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     document = create_indexed_document()
+    version = create_indexed_document_version(document.id)
+    document.current_version_id = version.id
     document.deactivate()
     chunks = [
         DocumentChunk(
             document_id=document.id,
+            document_version_id=version.id,
             chunk_index=0,
             content="First chunk",
             embedding=create_test_embedding(0.1),
@@ -133,6 +225,7 @@ async def test_postgres_document_repository_persists_document_workflow() -> None
         ),
         DocumentChunk(
             document_id=document.id,
+            document_version_id=version.id,
             chunk_index=1,
             content="Second chunk",
             embedding=create_test_embedding(0.2),
@@ -145,6 +238,7 @@ async def test_postgres_document_repository_persists_document_workflow() -> None
         async with session_factory() as session:
             repository = PostgresDocumentRepository(session)
             await repository.add(document)
+            await PostgresDocumentVersionRepository(session).add(version)
             await repository.replace_chunks(document.id, chunks)
             await session.commit()
 
@@ -173,6 +267,11 @@ async def test_postgres_document_repository_persists_document_workflow() -> None
         async with session_factory() as session:
             await session.execute(
                 delete(DocumentChunkRecord).where(DocumentChunkRecord.document_id == document.id)
+            )
+            await session.execute(
+                delete(DocumentVersionRecord).where(
+                    DocumentVersionRecord.document_id == document.id
+                )
             )
             await session.execute(delete(DocumentRecord).where(DocumentRecord.id == document.id))
             await session.commit()

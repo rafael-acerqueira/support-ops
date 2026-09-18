@@ -10,6 +10,7 @@ from supportops_api.application.documents import (
     DocumentProcessor,
     DocumentRepository,
     DocumentStorage,
+    DocumentVersionRepository,
     EmbeddingGenerator,
 )
 from supportops_api.application.response_suggestions import (
@@ -24,6 +25,7 @@ from supportops_api.infrastructure.embeddings import get_embedding_generator_fro
 from supportops_api.infrastructure.persistence import (
     PostgresDocumentChunkRepository,
     PostgresDocumentRepository,
+    PostgresDocumentVersionRepository,
     PostgresResponseSuggestionRepository,
     PostgresTicketRepository,
 )
@@ -40,6 +42,12 @@ def get_document_repository(
     session: AsyncSession = Depends(get_session),
 ) -> DocumentRepository:
     return PostgresDocumentRepository(session)
+
+
+def get_document_version_repository(
+    session: AsyncSession = Depends(get_session),
+) -> DocumentVersionRepository:
+    return PostgresDocumentVersionRepository(session)
 
 
 def get_document_storage() -> DocumentStorage:
