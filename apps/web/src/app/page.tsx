@@ -140,6 +140,10 @@ function humanize(value: string) {
     .join(' ');
 }
 
+function documentNameFromFile(fileName: string) {
+  return fileName.replace(/\.[^/.]+$/, '');
+}
+
 function getDocumentReadiness(document: KnowledgeDocument): {
   label: string;
   message: string;
@@ -186,7 +190,9 @@ function getDocumentReadiness(document: KnowledgeDocument): {
 
 export default function DocumentsPage() {
   const detailPanelRef = useRef<HTMLElement | null>(null);
+  const documentNameWasEditedRef = useRef(false);
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
+  const [documentName, setDocumentName] = useState('');
   const [documentType, setDocumentType] = useState<DocumentType>('internal_policy');
   const [productArea, setProductArea] = useState<ProductArea>('support');
   const [tags, setTags] = useState('enterprise, sla');
@@ -349,7 +355,12 @@ export default function DocumentsPage() {
   }, [isPolling, loadDocumentChunks, loadDocumentVersions, loadDocuments, selectedDocumentId]);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    setFile(event.target.files?.[0] ?? null);
+    const selectedFile = event.target.files?.[0] ?? null;
+    setFile(selectedFile);
+
+    if (selectedFile && !documentNameWasEditedRef.current) {
+      setDocumentName(documentNameFromFile(selectedFile.name));
+    }
   }
 
   function handleVersionFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -364,7 +375,13 @@ export default function DocumentsPage() {
       return;
     }
 
+    if (!documentName.trim()) {
+      setError('Enter a document name.');
+      return;
+    }
+
     const formData = new FormData();
+    formData.append('name', documentName.trim());
     formData.append('document_type', documentType);
     formData.append('product_area', productArea);
     tags
@@ -405,6 +422,8 @@ export default function DocumentsPage() {
         watchDocument(uploadedDocument.id);
 
       setFile(null);
+      setDocumentName('');
+      documentNameWasEditedRef.current = false;
       setMessage('Document uploaded. Processing queued.');
     } catch (uploadError) {
       setError(
@@ -650,6 +669,20 @@ export default function DocumentsPage() {
               </div>
             </div>
 
+            <label className="field document-name-field">
+              <span>Document name</span>
+              <input
+                value={documentName}
+                onChange={(event) => {
+                  documentNameWasEditedRef.current = true;
+                  setDocumentName(event.target.value);
+                }}
+                placeholder="Refund Policy"
+                maxLength={255}
+                required
+              />
+            </label>
+
             <label className="field">
               <span>Document type</span>
               <select
@@ -693,7 +726,11 @@ export default function DocumentsPage() {
               <input type="file" onChange={handleFileChange} />
             </label>
 
-            <button className="primary-button" type="submit" disabled={isUploading}>
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={isUploading || !file || !documentName.trim()}
+            >
               {isUploading ? (
                 <Loader2 className="spin" size={18} aria-hidden="true" />
               ) : (

@@ -158,6 +158,10 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.document-name-field {
+  grid-column: 1 / -1;
+}
+
 .upload-panel .primary-button {
   min-height: 44px;
 }

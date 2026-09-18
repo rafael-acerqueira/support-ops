@@ -655,6 +655,7 @@ async def test_upload_document(
     response = await client.post(
         "/api/documents/upload",
         data={
+            "name": "Enterprise SLA",
             "document_type": "sla_policy",
             "product_area": "support",
             "tags": ["enterprise", "sla"],
@@ -664,7 +665,7 @@ async def test_upload_document(
 
     body = response.json()
     assert response.status_code == 201
-    assert body["name"] == "enterprise-sla.md"
+    assert body["name"] == "Enterprise SLA"
     assert body["document_type"] == "sla_policy"
     assert body["product_area"] == "support"
     assert body["size_bytes"] == len(b"SLA policy content")
@@ -695,7 +696,7 @@ async def test_upload_document_returns_400_for_empty_file(
 
     response = await client.post(
         "/api/documents/upload",
-        data={"document_type": "faq", "product_area": "support"},
+        data={"name": "Empty FAQ", "document_type": "faq", "product_area": "support"},
         files={"file": ("empty.md", b"", "text/markdown")},
     )
 

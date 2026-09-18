@@ -105,6 +105,7 @@ async def create_document(
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
+    name: str = Form(..., min_length=1, max_length=255),
     document_type: DocumentType = Form(...),
     product_area: ProductArea = Form(...),
     tags: list[str] = Form(default_factory=list),
@@ -131,7 +132,7 @@ async def upload_document(
 
     document = await CreateDocument(repository).execute(
         CreateDocumentInput(
-            name=stored_file.file_name,
+            name=name,
             document_type=document_type,
             product_area=product_area,
             tags=tuple(tags),
